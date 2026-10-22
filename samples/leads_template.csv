@@ -1,0 +1,4 @@
+first_name,last_name,email,phone,source,sport,position,location,notes
+Jamie,Rivera,jamie.rivera@example.com,555-0101,Indeed,Basketball,Head Coach,Austin TX,Fake sample row for column mapping testing
+Taylor,Chen,,555-0102,LinkedIn,Soccer,Assistant Coach,Denver CO,Fake sample row with no email
+Morgan,Patel,morgan.patel@example.com,,Other,Baseball,Scout,Tampa FL,Fake sample row with no phone
