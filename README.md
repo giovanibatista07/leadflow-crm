@@ -17,9 +17,14 @@ See [SPEC.md](./SPEC.md) for the full product spec and [CLAUDE.md](./CLAUDE.md) 
 ```bash
 npm install
 cp .env.example .env   # fill in your own Supabase/Google values
-npx prisma migrate dev
+npx prisma migrate deploy
 npm run dev
 ```
+
+Row-level security policies live in `/supabase/migrations` as plain SQL (Prisma
+only manages table structure, not RLS). Run them against your Supabase
+project's SQL editor, or with the Supabase CLI (`supabase db push`) once one
+is set up -- they're written to run after the Prisma migrations.
 
 ## Commands
 

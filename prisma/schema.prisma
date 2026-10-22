@@ -1,9 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client"
   output   = "../lib/generated/prisma"
@@ -12,4 +9,330 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum LeadStatus {
+  NEW
+  IN_SEQUENCE
+  QUALIFIED
+  WITH_CLOSER
+  WON
+  LOST
+  UNRESPONSIVE
+  DO_NOT_CONTACT
+
+  @@map("lead_status")
+}
+
+enum CadenceActionType {
+  EMAIL
+  CALL
+  MESSAGE
+  MEETING
+  CUSTOM
+
+  @@map("cadence_action_type")
+}
+
+enum ImportSourceType {
+  CSV
+  TSV
+  EXCEL
+  GOOGLE_SHEETS
+
+  @@map("import_source_type")
+}
+
+enum NotificationType {
+  NEW_ASSIGNMENT
+  HANDOFF
+  STEP_DUE
+  MEETING_SOON
+  OVERDUE
+
+  @@map("notification_type")
+}
+
+// ---------------------------------------------------------------------------
+// Company, roles and users
+// ---------------------------------------------------------------------------
+
+model Company {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name        String
+  emailDomain String   @unique @map("email_domain")
+  // Nullable so the owner's own User row (which references this company)
+  // can be created first; set once via an owner-initiated transfer/signup.
+  ownerId     String?  @unique @map("owner_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  owner              User?               @relation("CompanyOwner", fields: [ownerId], references: [id])
+  users              User[]              @relation("CompanyMembers")
+  roles              Role[]
+  leads              Lead[]
+  cadences           Cadence[]
+  activities         Activity[]
+  importBatches      ImportBatch[]
+  auditLogs          AuditLog[]
+  notifications      Notification[]
+  savedViews         SavedView[]
+  googleConnections  GoogleConnection[]
+
+  @@map("companies")
+}
+
+model Role {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String   @map("company_id") @db.Uuid
+  name        String
+  permissions Json
+  isDefault   Boolean  @default(false) @map("is_default")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  company      Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  users        User[]
+  cadenceSteps CadenceStep[]
+
+  @@unique([companyId, name])
+  @@index([companyId])
+  @@map("roles")
+}
+
+model User {
+  // Matches the Supabase Auth user id (auth.users.id); not app-generated.
+  id        String   @id @db.Uuid
+  name      String
+  email     String   @unique
+  companyId String   @map("company_id") @db.Uuid
+  roleId    String   @map("role_id") @db.Uuid
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company Company @relation("CompanyMembers", fields: [companyId], references: [id], onDelete: Cascade)
+  role    Role    @relation(fields: [roleId], references: [id])
+
+  ownedCompany        Company?           @relation("CompanyOwner")
+  advisorLeads        Lead[]             @relation("LeadAdvisor")
+  closerLeads         Lead[]             @relation("LeadCloser")
+  activities          Activity[]
+  importBatches       ImportBatch[]
+  auditLogs           AuditLog[]
+  notifications       Notification[]
+  savedViews          SavedView[]
+  googleConnection    GoogleConnection?
+
+  @@index([companyId])
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Leads
+// ---------------------------------------------------------------------------
+
+model Lead {
+  id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId         String     @map("company_id") @db.Uuid
+  firstName         String     @map("first_name")
+  lastName          String     @map("last_name")
+  email             String?
+  phone             String?
+  source            String
+  sport             String?
+  position          String?
+  location          String?
+  notes             String?
+  status            LeadStatus @default(NEW)
+  assignedAdvisorId String?    @map("assigned_advisor_id") @db.Uuid
+  assignedCloserId  String?    @map("assigned_closer_id") @db.Uuid
+  currentStep       Int        @default(0) @map("current_step")
+  nextDueAt         DateTime?  @map("next_due_at")
+  createdAt         DateTime   @default(now()) @map("created_at")
+
+  company         Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  assignedAdvisor User?      @relation("LeadAdvisor", fields: [assignedAdvisorId], references: [id])
+  assignedCloser  User?      @relation("LeadCloser", fields: [assignedCloserId], references: [id])
+  activities      Activity[]
+  notifications   Notification[]
+
+  @@index([companyId])
+  @@index([assignedAdvisorId])
+  @@index([assignedCloserId])
+  @@index([companyId, status])
+  @@index([nextDueAt])
+  @@map("leads")
+}
+
+// ---------------------------------------------------------------------------
+// Cadence
+// ---------------------------------------------------------------------------
+
+model Cadence {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  name      String
+  isDefault Boolean  @default(false) @map("is_default")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company Company       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  steps   CadenceStep[]
+
+  @@index([companyId])
+  @@map("cadences")
+}
+
+model CadenceStep {
+  id             String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cadenceId      String            @map("cadence_id") @db.Uuid
+  order          Int
+  actionType     CadenceActionType @map("action_type")
+  assignedRoleId String            @map("assigned_role_id") @db.Uuid
+  waitDays       Int?              @map("wait_days")
+  defaultTime    String?           @map("default_time")
+  templateText   String?           @map("template_text")
+
+  cadence      Cadence @relation(fields: [cadenceId], references: [id], onDelete: Cascade)
+  assignedRole Role    @relation(fields: [assignedRoleId], references: [id])
+
+  @@unique([cadenceId, order])
+  @@index([cadenceId])
+  @@map("cadence_steps")
+}
+
+// ---------------------------------------------------------------------------
+// Activity (outreach log, incl. pasted Granola notes)
+// ---------------------------------------------------------------------------
+
+model Activity {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  leadId      String    @map("lead_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  type        String
+  outcome     String?
+  notes       String?
+  scheduledAt DateTime? @map("scheduled_at")
+  completedAt DateTime? @map("completed_at")
+  granolaNote String?   @map("granola_note")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  lead    Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id])
+
+  @@index([companyId])
+  @@index([leadId])
+  @@index([userId])
+  @@index([scheduledAt])
+  @@map("activities")
+}
+
+// ---------------------------------------------------------------------------
+// Imports
+// ---------------------------------------------------------------------------
+
+model ImportBatch {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId         String           @map("company_id") @db.Uuid
+  uploadedById      String           @map("uploaded_by") @db.Uuid
+  sourceType        ImportSourceType @map("source_type")
+  // Filename for file uploads, or the Google Sheet id for Sheets imports.
+  sourceRef         String           @map("source_ref")
+  rowCount          Int              @map("row_count")
+  duplicatesSkipped Int              @map("duplicates_skipped")
+  createdAt         DateTime         @default(now()) @map("created_at")
+
+  company    Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  uploadedBy User    @relation(fields: [uploadedById], references: [id])
+
+  @@index([companyId])
+  @@map("import_batches")
+}
+
+// ---------------------------------------------------------------------------
+// Audit log
+// ---------------------------------------------------------------------------
+
+model AuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId  String   @map("company_id") @db.Uuid
+  // Nullable so the log entry survives if the acting user is later removed.
+  userId     String?  @map("user_id") @db.Uuid
+  action     String
+  targetType String   @map("target_type")
+  // Polymorphic reference (varies by targetType); no FK constraint.
+  targetId   String?  @map("target_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+// ---------------------------------------------------------------------------
+// Notifications
+// ---------------------------------------------------------------------------
+
+model Notification {
+  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String           @map("company_id") @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  leadId    String?          @map("lead_id") @db.Uuid
+  readAt    DateTime?        @map("read_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lead    Lead?   @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@index([userId, readAt])
+  @@map("notifications")
+}
+
+// ---------------------------------------------------------------------------
+// Saved views
+// ---------------------------------------------------------------------------
+
+model SavedView {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  name      String
+  filters   Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+  @@index([companyId])
+  @@map("saved_views")
+}
+
+// ---------------------------------------------------------------------------
+// Google connections (Sheets import + Calendar sync)
+// ---------------------------------------------------------------------------
+
+model GoogleConnection {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId       String   @map("company_id") @db.Uuid
+  userId          String   @unique @map("user_id") @db.Uuid
+  scopes          String[]
+  // Encrypted at the application layer before being stored.
+  encryptedTokens String   @map("encrypted_tokens")
+  connectedAt     DateTime @default(now()) @map("connected_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("google_connections")
 }
