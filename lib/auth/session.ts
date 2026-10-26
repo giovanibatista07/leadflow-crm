@@ -8,9 +8,16 @@ import type { AuthenticatedUser } from "@/lib/auth/permissions";
  * `auth.getUser()` re-validates the session against the Auth server rather
  * than trusting the cookie, so this is safe to use for access checks.
  */
-export async function getCurrentUser(): Promise<
-  (AuthenticatedUser & { name: string; email: string; companyId: string; companyOwnerId: string | null }) | null
-> {
+export type CurrentUser = AuthenticatedUser & {
+  name: string;
+  email: string;
+  companyId: string;
+  companyOwnerId: string | null;
+  companyEmailDomain: string;
+  managersCanManageRolesAndInvites: boolean;
+};
+
+export async function getCurrentUser(): Promise<CurrentUser | null> {
   const supabase = await createClient();
   const {
     data: { user: authUser },
@@ -20,7 +27,12 @@ export async function getCurrentUser(): Promise<
 
   const user = await prisma.user.findUnique({
     where: { id: authUser.id },
-    include: { role: true, company: { select: { ownerId: true } } },
+    include: {
+      role: true,
+      company: {
+        select: { ownerId: true, emailDomain: true, managersCanManageRolesAndInvites: true },
+      },
+    },
   });
 
   if (!user) return null;
@@ -31,6 +43,8 @@ export async function getCurrentUser(): Promise<
     email: user.email,
     companyId: user.companyId,
     companyOwnerId: user.company.ownerId,
+    companyEmailDomain: user.company.emailDomain,
+    managersCanManageRolesAndInvites: user.company.managersCanManageRolesAndInvites,
     roleId: user.roleId,
     roleName: user.role.name,
     permissions: user.role.permissions as string[],
