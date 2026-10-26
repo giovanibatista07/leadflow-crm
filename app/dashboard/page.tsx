@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
+import { hasPermission } from "@/lib/auth/permissions";
 import { logOut } from "@/app/login/actions";
 
 export default async function DashboardPage() {
@@ -18,6 +19,12 @@ export default async function DashboardPage() {
       </p>
       <p>
         <Link href="/team">Team</Link>
+        {hasPermission(user, "import_leads") && (
+          <>
+            {" · "}
+            <Link href="/import">Import leads</Link>
+          </>
+        )}
       </p>
       <form action={logOut}>
         <button type="submit">Log out</button>
