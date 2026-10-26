@@ -86,6 +86,7 @@ model Company {
   savedViews         SavedView[]
   googleConnections  GoogleConnection[]
   invites            Invite[]
+  importMappings     ImportMapping[]
 
   @@map("companies")
 }
@@ -284,6 +285,23 @@ model ImportBatch {
 
   @@index([companyId])
   @@map("import_batches")
+}
+
+// Column mapping remembered per lead source (SPEC.md: "saved mappings per
+// source"), e.g. how "First Name"/"E-mail" map to our fields for "Indeed".
+model ImportMapping {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId String   @map("company_id") @db.Uuid
+  source    String
+  mapping   Json
+  updatedAt DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, source])
+  @@index([companyId])
+  @@map("import_mappings")
 }
 
 // ---------------------------------------------------------------------------
