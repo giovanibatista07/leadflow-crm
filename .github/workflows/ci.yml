@@ -27,6 +27,12 @@ jobs:
     env:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/leadflow?sslmode=disable
       DIRECT_URL: postgres://postgres:postgres@localhost:5432/leadflow?sslmode=disable
+      # Fake but validly-shaped values so build/typecheck don't need a real
+      # Supabase project. Never real secrets -- just enough for the code
+      # paths that read these at build/import time to not blow up.
+      NEXT_PUBLIC_SUPABASE_URL: https://ci-placeholder.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+      SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
 
     steps:
       - uses: actions/checkout@v4
