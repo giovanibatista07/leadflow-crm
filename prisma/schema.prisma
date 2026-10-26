@@ -7,8 +7,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ---------------------------------------------------------------------------
@@ -68,6 +69,9 @@ model Company {
   // Nullable so the owner's own User row (which references this company)
   // can be created first; set once via an owner-initiated transfer/signup.
   ownerId     String?  @unique @map("owner_id") @db.Uuid
+  // SPEC.md section 3: managers can create roles and invite people only
+  // "if the owner allows" -- off by default, the owner opts in.
+  managersCanManageRolesAndInvites Boolean @default(false) @map("managers_can_manage_roles_and_invites")
   createdAt   DateTime @default(now()) @map("created_at")
 
   owner              User?               @relation("CompanyOwner", fields: [ownerId], references: [id])
@@ -81,6 +85,7 @@ model Company {
   notifications      Notification[]
   savedViews         SavedView[]
   googleConnections  GoogleConnection[]
+  invites            Invite[]
 
   @@map("companies")
 }
@@ -96,6 +101,7 @@ model Role {
   company      Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   users        User[]
   cadenceSteps CadenceStep[]
+  invites      Invite[]
 
   @@unique([companyId, name])
   @@index([companyId])
@@ -124,9 +130,37 @@ model User {
   notifications       Notification[]
   savedViews          SavedView[]
   googleConnection    GoogleConnection?
+  sentInvites         Invite[]
 
   @@index([companyId])
   @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Team invites
+// ---------------------------------------------------------------------------
+
+model Invite {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyId   String    @map("company_id") @db.Uuid
+  email       String
+  roleId      String    @map("role_id") @db.Uuid
+  invitedById String    @map("invited_by") @db.Uuid
+  // SHA-256 of the token embedded in the invite link; the raw token is
+  // never stored, only ever shown once at creation time.
+  tokenHash   String    @unique @map("token_hash")
+  expiresAt   DateTime  @map("expires_at")
+  acceptedAt  DateTime? @map("accepted_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  role      Role    @relation(fields: [roleId], references: [id])
+  invitedBy User    @relation(fields: [invitedById], references: [id])
+
+  @@index([companyId])
+  @@index([email])
+  @@map("invites")
 }
 
 // ---------------------------------------------------------------------------

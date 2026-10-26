@@ -3,10 +3,12 @@ import {
   assertCanChangeRole,
   assertCanDeactivateUser,
   assertCanRemoveUser,
+  canManageRolesAndInvites,
   hasPermission,
   isManagerOrOwner,
   OwnerProtectionError,
   PermissionError,
+  requireManageRolesAndInvites,
   requirePermission,
   type AuthenticatedUser,
 } from "@/lib/auth/permissions";
@@ -93,5 +95,48 @@ describe("owner protection invariants", () => {
 
   it("allows changing a non-owner's role", () => {
     expect(() => assertCanChangeRole("someone-else", ownerId, "closer")).not.toThrow();
+  });
+});
+
+describe("canManageRolesAndInvites (SPEC.md: manager access is owner-delegated)", () => {
+  it("always allows the owner, regardless of the company setting", () => {
+    const owner = user({ roleName: "owner" });
+    expect(canManageRolesAndInvites(owner, { managersCanManageRolesAndInvites: false })).toBe(
+      true,
+    );
+    expect(canManageRolesAndInvites(owner, { managersCanManageRolesAndInvites: true })).toBe(
+      true,
+    );
+  });
+
+  it("blocks a manager unless the company has delegated to managers", () => {
+    const manager = user({ roleName: "manager" });
+    expect(canManageRolesAndInvites(manager, { managersCanManageRolesAndInvites: false })).toBe(
+      false,
+    );
+    expect(canManageRolesAndInvites(manager, { managersCanManageRolesAndInvites: true })).toBe(
+      true,
+    );
+  });
+
+  it("always blocks advisors and closers, even when delegated", () => {
+    const advisor = user({ roleName: "advisor" });
+    expect(canManageRolesAndInvites(advisor, { managersCanManageRolesAndInvites: true })).toBe(
+      false,
+    );
+  });
+
+  it("requireManageRolesAndInvites throws for a non-delegated manager", () => {
+    const manager = user({ roleName: "manager" });
+    expect(() =>
+      requireManageRolesAndInvites(manager, { managersCanManageRolesAndInvites: false }),
+    ).toThrow(PermissionError);
+  });
+
+  it("requireManageRolesAndInvites passes for the owner even when delegation is off", () => {
+    const owner = user({ roleName: "owner" });
+    expect(() =>
+      requireManageRolesAndInvites(owner, { managersCanManageRolesAndInvites: false }),
+    ).not.toThrow();
   });
 });

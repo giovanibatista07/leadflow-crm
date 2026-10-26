@@ -32,3 +32,21 @@ export const DEFAULT_ROLES = [
 ] as const;
 
 export type DefaultRoleName = (typeof DEFAULT_ROLES)[number]["name"];
+
+/** Every capability a role (default or custom) can be granted. */
+export const ALL_CAPABILITIES = [
+  "import_leads",
+  "manage_cadence",
+  "assign_leads",
+  "reassign_leads",
+  "view_all_leads",
+  "invite_users",
+  "manage_roles",
+  "view_own_leads",
+  "log_activity",
+  "handoff_to_closer",
+  "view_assigned_leads",
+  "set_won_lost",
+] as const;
+
+export type Capability = (typeof ALL_CAPABILITIES)[number];
