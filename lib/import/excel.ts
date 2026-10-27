@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { dedupeHeaders } from "@/lib/import/csv";
 
 const VBA_PROJECT_MARKER = Buffer.from("xl/vbaProject.bin", "ascii");
 
@@ -50,10 +51,11 @@ export async function parseExcelBuffer(buffer: Buffer): Promise<ParsedExcel> {
   }
 
   const headerRow = sheet.getRow(1);
-  const headers: string[] = [];
+  const rawHeaders: string[] = [];
   headerRow.eachCell({ includeEmpty: false }, (cell, colNumber) => {
-    headers[colNumber - 1] = cellToText(cell.value).trim();
+    rawHeaders[colNumber - 1] = cellToText(cell.value).trim();
   });
+  const headers = dedupeHeaders(rawHeaders);
 
   const rows: Record<string, string>[] = [];
   for (let rowNumber = 2; rowNumber <= sheet.rowCount; rowNumber++) {

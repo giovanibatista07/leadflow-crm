@@ -1,13 +1,68 @@
 import { describe, expect, it } from "vitest";
 import {
   applyMapping,
+  dedupeHeaders,
   escapeFormulaInjection,
   MAX_IMPORT_FILE_BYTES,
   normalizeHeader,
   parseDelimitedText,
   sniffImportFile,
+  splitFullName,
   suggestMapping,
 } from "@/lib/import/csv";
+
+describe("splitFullName", () => {
+  it("splits on the first space", () => {
+    expect(splitFullName("Jamie Rivera")).toEqual({ firstName: "Jamie", lastName: "Rivera" });
+  });
+
+  it("puts the remainder in lastName for a multi-word name", () => {
+    expect(splitFullName("Mary Jane Watson")).toEqual({
+      firstName: "Mary",
+      lastName: "Jane Watson",
+    });
+  });
+
+  it("repeats a single word as both first and last name", () => {
+    expect(splitFullName("Cher")).toEqual({ firstName: "Cher", lastName: "Cher" });
+  });
+
+  it("trims and collapses extra whitespace", () => {
+    expect(splitFullName("  Jamie   Rivera  ")).toEqual({ firstName: "Jamie", lastName: "Rivera" });
+  });
+});
+
+describe("dedupeHeaders", () => {
+  it("leaves unique headers unchanged", () => {
+    expect(dedupeHeaders(["Name", "Email"])).toEqual(["Name", "Email"]);
+  });
+
+  it("suffixes repeated headers so every name is unique", () => {
+    expect(dedupeHeaders(["Instagram Leads", "Email", "Instagram Leads"])).toEqual([
+      "Instagram Leads",
+      "Email",
+      "Instagram Leads (2)",
+    ]);
+  });
+
+  it("handles three or more repeats", () => {
+    expect(dedupeHeaders(["A", "A", "A"])).toEqual(["A", "A (2)", "A (3)"]);
+  });
+});
+
+describe("parseDelimitedText with duplicate headers", () => {
+  it("keeps both columns' data instead of the second overwriting the first", () => {
+    const { headers, rows } = parseDelimitedText(
+      "first_name,Instagram Leads,Instagram Leads\nJamie,handle1,handle2\n",
+    );
+    expect(headers).toEqual(["first_name", "Instagram Leads", "Instagram Leads (2)"]);
+    expect(rows[0]).toEqual({
+      first_name: "Jamie",
+      "Instagram Leads": "handle1",
+      "Instagram Leads (2)": "handle2",
+    });
+  });
+});
 
 describe("sniffImportFile", () => {
   it("rejects an empty file", () => {
@@ -104,6 +159,19 @@ describe("applyMapping", () => {
     expect(mapped.firstName).toBe("Jamie");
     expect(mapped.email).toBe("jamie@example.com");
     expect(mapped.phone).toBe("");
+  });
+
+  it("splits a mapped Full name column into first/last", () => {
+    const row = { Name: "Jamie Rivera", Email: "jamie@example.com" };
+    const mapped = applyMapping(row, { fullName: "Name", email: "Email" });
+    expect(mapped.firstName).toBe("Jamie");
+    expect(mapped.lastName).toBe("Rivera");
+  });
+
+  it("prefers fullName over individually mapped first/last columns", () => {
+    const row = { Name: "Jamie Rivera", "First Name": "Ignored" };
+    const mapped = applyMapping(row, { fullName: "Name", firstName: "First Name" });
+    expect(mapped.firstName).toBe("Jamie");
   });
 
   it("returns an empty string for an unmapped field", () => {
