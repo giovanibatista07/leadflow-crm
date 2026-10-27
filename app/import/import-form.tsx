@@ -6,6 +6,7 @@ import { LEAD_FIELDS, type ColumnMapping } from "@/lib/import/csv";
 import { importLeads, previewMapping, type ImportResult } from "./actions";
 
 const FIELD_LABELS: Record<(typeof LEAD_FIELDS)[number], string> = {
+  fullName: "Full name (splits into first/last automatically)",
   firstName: "First name",
   lastName: "Last name",
   email: "Email",

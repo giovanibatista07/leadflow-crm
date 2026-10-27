@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { PermissionError, requirePermission } from "@/lib/auth/permissions";
 import {
   applyMapping,
+  dedupeHeaders,
   escapeFormulaInjection,
   MAX_IMPORT_ROWS,
   parseDelimitedText,
@@ -17,6 +18,9 @@ import {
 import { dedupeRows, type DedupeInput } from "@/lib/import/dedupe";
 import { isMacroEnabledWorkbook, parseExcelBuffer } from "@/lib/import/excel";
 import { importFormSchema, leadImportRowSchema } from "@/lib/validation/import";
+import { extractSpreadsheetId, fetchSheetData } from "@/lib/google/sheets";
+import { getValidAccessToken } from "@/lib/google/token";
+import type { CurrentUser } from "@/lib/auth/session";
 
 export type MappingPreviewResult =
   | { error: string }
@@ -58,6 +62,15 @@ async function parseImportBuffer(buffer: Buffer): Promise<ParsedImport> {
   return { headers, rows, sourceType: delimiter === "\t" ? "TSV" : "CSV" };
 }
 
+async function lookUpSavedMapping(companyId: string, source: string) {
+  const trimmed = source.trim();
+  if (!trimmed) return null;
+  const existing = await prisma.importMapping.findUnique({
+    where: { companyId_source: { companyId, source: trimmed } },
+  });
+  return existing ? (existing.mapping as ColumnMapping) : null;
+}
+
 /**
  * For CSV/TSV the browser already parsed headers with Papa Parse to drive
  * the mapping screen; this just looks up a saved mapping to prefill it.
@@ -96,21 +109,15 @@ export async function previewMapping(formData: FormData): Promise<MappingPreview
     if (typeof headersJson !== "string") {
       return { error: "Invalid input" };
     }
-    headers = JSON.parse(headersJson);
+    headers = dedupeHeaders(JSON.parse(headersJson));
     sampleRow = typeof sampleRowJson === "string" ? JSON.parse(sampleRowJson) : null;
   }
-
-  const existing = source.trim()
-    ? await prisma.importMapping.findUnique({
-        where: { companyId_source: { companyId: user.companyId, source: source.trim() } },
-      })
-    : null;
 
   return {
     headers,
     sampleRow,
     suggested: suggestMapping(headers),
-    saved: existing ? (existing.mapping as ColumnMapping) : null,
+    saved: await lookUpSavedMapping(user.companyId, source),
   };
 }
 
@@ -125,51 +132,20 @@ export type ImportResult =
       invalidSamples: string[];
     };
 
-export async function importLeads(formData: FormData): Promise<ImportResult> {
-  let user;
-  try {
-    user = await requireImporter();
-  } catch (err) {
-    return { error: err instanceof Error ? err.message : "Not allowed" };
-  }
-
-  const parsedForm = importFormSchema.safeParse({ source: formData.get("source") });
-  if (!parsedForm.success) {
-    return { error: parsedForm.error.issues[0]?.message ?? "Invalid input" };
-  }
-  const { source } = parsedForm.data;
-
-  const file = formData.get("file");
-  if (!(file instanceof File)) {
-    return { error: "Choose a file to import" };
-  }
-
-  const mappingJson = formData.get("mapping");
-  if (typeof mappingJson !== "string") {
-    return { error: "Invalid column mapping" };
-  }
-  let mapping: ColumnMapping;
-  try {
-    mapping = JSON.parse(mappingJson);
-  } catch {
-    return { error: "Invalid column mapping" };
-  }
-  if (!mapping.firstName && !mapping.lastName) {
-    return { error: "Map at least the name column" };
-  }
-
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const parsedFile = await parseImportBuffer(buffer);
-  if ("error" in parsedFile) {
-    return { error: parsedFile.error };
-  }
-  const { rows, sourceType } = parsedFile;
-
+/** Shared by every import source (file upload, Google Sheet): validate, dedupe, insert, record. */
+async function runImport(
+  user: CurrentUser,
+  rows: Record<string, string>[],
+  source: string,
+  mapping: ColumnMapping,
+  sourceType: "CSV" | "TSV" | "EXCEL" | "GOOGLE_SHEETS",
+  sourceRef: string,
+): Promise<ImportResult> {
   if (rows.length === 0) {
-    return { error: "No rows found in file" };
+    return { error: "No rows found" };
   }
   if (rows.length > MAX_IMPORT_ROWS) {
-    return { error: `File has more than the ${MAX_IMPORT_ROWS}-row import limit` };
+    return { error: `More than the ${MAX_IMPORT_ROWS}-row import limit` };
   }
 
   const validRows: DedupeInput[] = [];
@@ -182,7 +158,7 @@ export async function importLeads(formData: FormData): Promise<ImportResult> {
     if (!parsed.success) {
       flaggedInvalid += 1;
       if (invalidSamples.length < 5) {
-        const rowNumber = index + 2; // +1 for header row, +1 for 1-indexing
+        const rowNumber = index + 2;
         invalidSamples.push(`Row ${rowNumber}: ${parsed.error.issues[0]?.message ?? "invalid"}`);
       }
       return;
@@ -207,58 +183,54 @@ export async function importLeads(formData: FormData): Promise<ImportResult> {
     existingPhones,
   );
 
-  const batch = await prisma.$transaction(async (tx) => {
-    if (toInsert.length > 0) {
-      await tx.lead.createMany({
-        data: toInsert.map((row) => ({
+  await prisma.$transaction(
+    async (tx) => {
+      if (toInsert.length > 0) {
+        await tx.lead.createMany({
+          data: toInsert.map((row) => ({
+            companyId: user.companyId,
+            firstName: escapeFormulaInjection(row.firstName),
+            lastName: escapeFormulaInjection(row.lastName),
+            email: row.email || null,
+            phone: escapeFormulaInjection(row.phone) || null,
+            source,
+            sport: row.sport ? escapeFormulaInjection(row.sport) : null,
+            position: row.position ? escapeFormulaInjection(row.position) : null,
+            location: row.location ? escapeFormulaInjection(row.location) : null,
+            notes: row.notes ? escapeFormulaInjection(row.notes) : null,
+          })),
+        });
+      }
+
+      const createdBatch = await tx.importBatch.create({
+        data: {
           companyId: user.companyId,
-          firstName: escapeFormulaInjection(row.firstName),
-          lastName: escapeFormulaInjection(row.lastName),
-          email: row.email || null,
-          phone: escapeFormulaInjection(row.phone) || null,
-          source,
-          sport: row.sport ? escapeFormulaInjection(row.sport) : null,
-          position: row.position ? escapeFormulaInjection(row.position) : null,
-          location: row.location ? escapeFormulaInjection(row.location) : null,
-          notes: row.notes ? escapeFormulaInjection(row.notes) : null,
-        })),
+          uploadedById: user.id,
+          sourceType,
+          sourceRef,
+          rowCount: toInsert.length,
+          duplicatesSkipped: duplicateInFile.length + duplicateInDb.length,
+        },
       });
-    }
 
-    const createdBatch = await tx.importBatch.create({
-      data: {
-        companyId: user.companyId,
-        uploadedById: user.id,
-        sourceType,
-        sourceRef: file.name,
-        rowCount: toInsert.length,
-        duplicatesSkipped: duplicateInFile.length + duplicateInDb.length,
-      },
-    });
+      await tx.importMapping.upsert({
+        where: { companyId_source: { companyId: user.companyId, source } },
+        create: { companyId: user.companyId, source, mapping },
+        update: { mapping },
+      });
 
-    await tx.importMapping.upsert({
-      where: { companyId_source: { companyId: user.companyId, source } },
-      create: { companyId: user.companyId, source, mapping },
-      update: { mapping },
-    });
-
-    await tx.auditLog.create({
-      data: {
-        companyId: user.companyId,
-        userId: user.id,
-        action: "leads_imported",
-        targetType: "import_batch",
-        targetId: createdBatch.id,
-      },
-    });
-
-    return createdBatch;
-  }, { timeout: 20000 });
-
-  // The file is never written to disk -- it's processed entirely in memory
-  // and discarded when this request ends, which satisfies "delete uploaded
-  // files after import" more strongly than writing-then-unlinking would.
-  void batch;
+      await tx.auditLog.create({
+        data: {
+          companyId: user.companyId,
+          userId: user.id,
+          action: "leads_imported",
+          targetType: "import_batch",
+          targetId: createdBatch.id,
+        },
+      });
+    },
+    { timeout: 20000 },
+  );
 
   revalidatePath("/import");
 
@@ -270,6 +242,141 @@ export async function importLeads(formData: FormData): Promise<ImportResult> {
     flaggedInvalid,
     invalidSamples,
   };
+}
+
+function parseMappingField(formData: FormData): ColumnMapping | { error: string } {
+  const mappingJson = formData.get("mapping");
+  if (typeof mappingJson !== "string") {
+    return { error: "Invalid column mapping" };
+  }
+  try {
+    const mapping: ColumnMapping = JSON.parse(mappingJson);
+    if (!mapping.fullName && !mapping.firstName && !mapping.lastName) {
+      return { error: "Map a name column (either Full name, or First/Last name)" };
+    }
+    return mapping;
+  } catch {
+    return { error: "Invalid column mapping" };
+  }
+}
+
+export async function importLeads(formData: FormData): Promise<ImportResult> {
+  let user;
+  try {
+    user = await requireImporter();
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Not allowed" };
+  }
+
+  const parsedForm = importFormSchema.safeParse({ source: formData.get("source") });
+  if (!parsedForm.success) {
+    return { error: parsedForm.error.issues[0]?.message ?? "Invalid input" };
+  }
+  const { source } = parsedForm.data;
+
+  const file = formData.get("file");
+  if (!(file instanceof File)) {
+    return { error: "Choose a file to import" };
+  }
+
+  const mapping = parseMappingField(formData);
+  if ("error" in mapping) return mapping;
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  const parsedFile = await parseImportBuffer(buffer);
+  if ("error" in parsedFile) {
+    return { error: parsedFile.error };
+  }
+
+  return runImport(user, parsedFile.rows, source, mapping, parsedFile.sourceType, file.name);
+}
+
+export type IsGoogleConnectedResult = { connected: boolean };
+
+export async function isGoogleConnected(): Promise<IsGoogleConnectedResult> {
+  const user = await getCurrentUser();
+  if (!user) return { connected: false };
+  const connection = await prisma.googleConnection.findUnique({ where: { userId: user.id } });
+  return { connected: Boolean(connection) };
+}
+
+/** Same role as previewMapping, for a Google Sheet instead of an uploaded file. */
+export async function previewSheetMapping(formData: FormData): Promise<MappingPreviewResult> {
+  let user;
+  try {
+    user = await requireImporter();
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Not allowed" };
+  }
+
+  const sheetUrl = formData.get("sheetUrl");
+  const source = formData.get("source");
+  if (typeof sheetUrl !== "string" || typeof source !== "string") {
+    return { error: "Invalid input" };
+  }
+
+  const spreadsheetId = extractSpreadsheetId(sheetUrl);
+  if (!spreadsheetId) {
+    return { error: "That doesn't look like a Google Sheets link or ID" };
+  }
+
+  const accessToken = await getValidAccessToken(user.id);
+  if (!accessToken) {
+    return { error: "Connect your Google account first" };
+  }
+
+  try {
+    const { headers, rows } = await fetchSheetData(accessToken, spreadsheetId);
+    return {
+      headers,
+      sampleRow: rows[0] ?? null,
+      suggested: suggestMapping(headers),
+      saved: await lookUpSavedMapping(user.companyId, source),
+    };
+  } catch {
+    return { error: "Could not read that sheet. Make sure it's shared with your Google account." };
+  }
+}
+
+export async function importFromSheet(formData: FormData): Promise<ImportResult> {
+  let user;
+  try {
+    user = await requireImporter();
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Not allowed" };
+  }
+
+  const parsedForm = importFormSchema.safeParse({ source: formData.get("source") });
+  if (!parsedForm.success) {
+    return { error: parsedForm.error.issues[0]?.message ?? "Invalid input" };
+  }
+  const { source } = parsedForm.data;
+
+  const sheetUrl = formData.get("sheetUrl");
+  if (typeof sheetUrl !== "string") {
+    return { error: "Missing sheet link" };
+  }
+  const spreadsheetId = extractSpreadsheetId(sheetUrl);
+  if (!spreadsheetId) {
+    return { error: "That doesn't look like a Google Sheets link or ID" };
+  }
+
+  const mapping = parseMappingField(formData);
+  if ("error" in mapping) return mapping;
+
+  const accessToken = await getValidAccessToken(user.id);
+  if (!accessToken) {
+    return { error: "Connect your Google account first" };
+  }
+
+  let rows: Record<string, string>[];
+  try {
+    rows = (await fetchSheetData(accessToken, spreadsheetId)).rows;
+  } catch {
+    return { error: "Could not read that sheet. Make sure it's shared with your Google account." };
+  }
+
+  return runImport(user, rows, source, mapping, "GOOGLE_SHEETS", spreadsheetId);
 }
 
 export type { LeadField };
