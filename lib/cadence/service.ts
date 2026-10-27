@@ -5,16 +5,18 @@ import { prisma } from "@/lib/db";
 type TxClient = Prisma.TransactionClient;
 
 /**
- * Starts a lead on the company's default cadence (SPEC.md core workflow
- * step 4: "Each lead starts at Step 1 of the manager's sequence"). A
- * company with no default cadence yet just leaves the lead without a due
- * date -- it still shows as assigned, only not yet scheduled.
+ * Starts one or more leads on the company's default cadence (SPEC.md core
+ * workflow step 4: "Each lead starts at Step 1 of the manager's
+ * sequence"). A company with no default cadence yet just leaves the
+ * lead(s) without a due date -- still assigned, only not yet scheduled.
+ * One updateMany regardless of how many leads, not one call per lead.
  */
-export async function startCadenceForLead(
+export async function startCadenceForLeads(
   client: TxClient | typeof prisma,
   companyId: string,
-  leadId: string,
+  leadIds: string[],
 ): Promise<void> {
+  if (leadIds.length === 0) return;
   const cadence = await client.cadence.findFirst({
     where: { companyId, isDefault: true },
     include: { steps: { where: { order: 1 } } },
@@ -23,10 +25,18 @@ export async function startCadenceForLead(
   if (!firstStep) return;
 
   // Step 1 has no "wait before" itself -- it's due as soon as the lead starts.
-  await client.lead.update({
-    where: { id: leadId },
+  await client.lead.updateMany({
+    where: { id: { in: leadIds } },
     data: { currentStep: 1, nextDueAt: new Date() },
   });
+}
+
+export async function startCadenceForLead(
+  client: TxClient | typeof prisma,
+  companyId: string,
+  leadId: string,
+): Promise<void> {
+  return startCadenceForLeads(client, companyId, [leadId]);
 }
 
 export type SweepResult = { markedUnresponsive: number };

@@ -2,6 +2,7 @@ import "server-only";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { distributeRoundRobin, groupByAssignee } from "@/lib/assignment/engine";
+import { startCadenceForLead, startCadenceForLeads } from "@/lib/cadence/service";
 
 type TxClient = Prisma.TransactionClient;
 
@@ -85,6 +86,8 @@ export async function assignAdvisorsToNewLeads(
       data: { assignedAdvisorId: advisorId, status: "IN_SEQUENCE" },
     });
   }
+  // Every newly assigned lead starts its cadence at once, not per advisor.
+  await startCadenceForLeads(tx, companyId, [...assignments.keys()]);
   return assignments.size;
 }
 
@@ -104,13 +107,17 @@ export async function reassignLeadAdvisor(
     return { error: "That person isn't an active advisor on this company" };
   }
 
+  const wasUnstarted = lead.status === "NEW";
   await prisma.lead.update({
     where: { id: leadId },
     data: {
       assignedAdvisorId: advisorId,
-      status: lead.status === "NEW" ? "IN_SEQUENCE" : lead.status,
+      status: wasUnstarted ? "IN_SEQUENCE" : lead.status,
     },
   });
+  if (wasUnstarted) {
+    await startCadenceForLead(prisma, companyId, leadId);
+  }
   return { success: true };
 }
 
