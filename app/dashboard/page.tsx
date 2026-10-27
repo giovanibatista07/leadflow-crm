@@ -25,6 +25,12 @@ export default async function DashboardPage() {
             <Link href="/import">Import leads</Link>
           </>
         )}
+        {hasPermission(user, "manage_cadence") && (
+          <>
+            {" · "}
+            <Link href="/cadence">Cadences</Link>
+          </>
+        )}
       </p>
       <form action={logOut}>
         <button type="submit">Log out</button>
