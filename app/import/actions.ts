@@ -9,12 +9,13 @@ import {
   escapeFormulaInjection,
   MAX_IMPORT_ROWS,
   parseDelimitedText,
-  sniffTabularFile,
+  sniffImportFile,
   suggestMapping,
   type ColumnMapping,
   type LeadField,
 } from "@/lib/import/csv";
 import { dedupeRows, type DedupeInput } from "@/lib/import/dedupe";
+import { isMacroEnabledWorkbook, parseExcelBuffer } from "@/lib/import/excel";
 import { importFormSchema, leadImportRowSchema } from "@/lib/validation/import";
 
 export type MappingPreviewResult =
@@ -30,7 +31,40 @@ async function requireImporter() {
   return user;
 }
 
-/** Client-side parsing drives the mapping screen; this just looks up a saved mapping to prefill it. */
+type ParsedImport =
+  | { error: string }
+  | { headers: string[]; rows: Record<string, string>[]; sourceType: "CSV" | "TSV" | "EXCEL" };
+
+/** Shared by the mapping preview and the real import: one trusted parse per file. */
+async function parseImportBuffer(buffer: Buffer): Promise<ParsedImport> {
+  const sniff = sniffImportFile(buffer);
+  if (!sniff.ok) {
+    return { error: sniff.reason };
+  }
+
+  if (sniff.kind === "xlsx") {
+    if (isMacroEnabledWorkbook(buffer)) {
+      return { error: "Macro-enabled Excel files (.xlsm) aren't allowed" };
+    }
+    const { headers, rows } = await parseExcelBuffer(buffer);
+    return { headers, rows, sourceType: "EXCEL" };
+  }
+
+  const text = buffer.toString("utf-8");
+  const { headers, rows, errors, delimiter } = parseDelimitedText(text);
+  if (errors.length > 0 && rows.length === 0) {
+    return { error: "Could not read this file as CSV/TSV" };
+  }
+  return { headers, rows, sourceType: delimiter === "\t" ? "TSV" : "CSV" };
+}
+
+/**
+ * For CSV/TSV the browser already parsed headers with Papa Parse to drive
+ * the mapping screen; this just looks up a saved mapping to prefill it.
+ * For Excel there's no reasonable client-side parser, so the file itself
+ * is sent here and parsed server-side (the only parse that's trusted
+ * either way -- the real import re-parses from scratch regardless).
+ */
 export async function previewMapping(formData: FormData): Promise<MappingPreviewResult> {
   let user;
   try {
@@ -39,16 +73,32 @@ export async function previewMapping(formData: FormData): Promise<MappingPreview
     return { error: err instanceof Error ? err.message : "Not allowed" };
   }
 
-  const headersJson = formData.get("headers");
-  const sampleRowJson = formData.get("sampleRow");
   const source = formData.get("source");
-  if (typeof headersJson !== "string" || typeof source !== "string") {
+  if (typeof source !== "string") {
     return { error: "Invalid input" };
   }
 
-  const headers: string[] = JSON.parse(headersJson);
-  const sampleRow: Record<string, string> | null =
-    typeof sampleRowJson === "string" ? JSON.parse(sampleRowJson) : null;
+  let headers: string[];
+  let sampleRow: Record<string, string> | null;
+
+  const file = formData.get("file");
+  if (file instanceof File) {
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const parsed = await parseImportBuffer(buffer);
+    if ("error" in parsed) {
+      return { error: parsed.error };
+    }
+    headers = parsed.headers;
+    sampleRow = parsed.rows[0] ?? null;
+  } else {
+    const headersJson = formData.get("headers");
+    const sampleRowJson = formData.get("sampleRow");
+    if (typeof headersJson !== "string") {
+      return { error: "Invalid input" };
+    }
+    headers = JSON.parse(headersJson);
+    sampleRow = typeof sampleRowJson === "string" ? JSON.parse(sampleRowJson) : null;
+  }
 
   const existing = source.trim()
     ? await prisma.importMapping.findUnique({
@@ -109,17 +159,12 @@ export async function importLeads(formData: FormData): Promise<ImportResult> {
   }
 
   const buffer = Buffer.from(await file.arrayBuffer());
-  const sniff = sniffTabularFile(buffer);
-  if (!sniff.ok) {
-    return { error: sniff.reason };
+  const parsedFile = await parseImportBuffer(buffer);
+  if ("error" in parsedFile) {
+    return { error: parsedFile.error };
   }
+  const { rows, sourceType } = parsedFile;
 
-  const text = buffer.toString("utf-8");
-  const { rows, errors, delimiter } = parseDelimitedText(text);
-
-  if (errors.length > 0 && rows.length === 0) {
-    return { error: "Could not read this file as CSV/TSV" };
-  }
   if (rows.length === 0) {
     return { error: "No rows found in file" };
   }
@@ -184,7 +229,7 @@ export async function importLeads(formData: FormData): Promise<ImportResult> {
       data: {
         companyId: user.companyId,
         uploadedById: user.id,
-        sourceType: delimiter === "\t" ? "TSV" : "CSV",
+        sourceType,
         sourceRef: file.name,
         rowCount: toInsert.length,
         duplicatesSkipped: duplicateInFile.length + duplicateInDb.length,
