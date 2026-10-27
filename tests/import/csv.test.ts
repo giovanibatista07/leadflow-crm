@@ -5,44 +5,44 @@ import {
   MAX_IMPORT_FILE_BYTES,
   normalizeHeader,
   parseDelimitedText,
-  sniffTabularFile,
+  sniffImportFile,
   suggestMapping,
 } from "@/lib/import/csv";
 
-describe("sniffTabularFile", () => {
+describe("sniffImportFile", () => {
   it("rejects an empty file", () => {
-    const result = sniffTabularFile(Buffer.from(""));
+    const result = sniffImportFile(Buffer.from(""));
     expect(result.ok).toBe(false);
   });
 
   it("rejects a file over the size limit", () => {
-    const result = sniffTabularFile(Buffer.alloc(MAX_IMPORT_FILE_BYTES + 1, "a"));
+    const result = sniffImportFile(Buffer.alloc(MAX_IMPORT_FILE_BYTES + 1, "a"));
     expect(result.ok).toBe(false);
   });
 
-  it("rejects a zip/xlsx file by its PK magic bytes", () => {
-    const result = sniffTabularFile(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
-    expect(result.ok).toBe(false);
+  it("recognizes a zip/xlsx file by its PK magic bytes as a candidate .xlsx", () => {
+    const result = sniffImportFile(Buffer.from([0x50, 0x4b, 0x03, 0x04]));
+    expect(result).toEqual({ ok: true, kind: "xlsx" });
   });
 
   it("rejects a legacy .xls file by its OLE2 magic bytes", () => {
-    const result = sniffTabularFile(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]));
+    const result = sniffImportFile(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]));
     expect(result.ok).toBe(false);
   });
 
   it("rejects binary data containing null bytes", () => {
-    const result = sniffTabularFile(Buffer.from([0x61, 0x00, 0x62]));
+    const result = sniffImportFile(Buffer.from([0x61, 0x00, 0x62]));
     expect(result.ok).toBe(false);
   });
 
   it("accepts plain CSV text", () => {
-    const result = sniffTabularFile(Buffer.from("first_name,last_name\nJamie,Rivera\n"));
-    expect(result.ok).toBe(true);
+    const result = sniffImportFile(Buffer.from("first_name,last_name\nJamie,Rivera\n"));
+    expect(result).toEqual({ ok: true, kind: "text" });
   });
 
   it("accepts plain TSV text", () => {
-    const result = sniffTabularFile(Buffer.from("first_name\tlast_name\nJamie\tRivera\n"));
-    expect(result.ok).toBe(true);
+    const result = sniffImportFile(Buffer.from("first_name\tlast_name\nJamie\tRivera\n"));
+    expect(result).toEqual({ ok: true, kind: "text" });
   });
 });
 

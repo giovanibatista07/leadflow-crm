@@ -25,28 +25,43 @@ export function ImportForm() {
   const [pending, setPending] = useState(false);
   const [result, setResult] = useState<ImportResult | null>(null);
 
+  async function applyPreview(formData: FormData) {
+    const preview = await previewMapping(formData);
+    if ("error" in preview) {
+      setError(preview.error);
+      return;
+    }
+    setHeaders(preview.headers);
+    setMapping({ ...preview.suggested, ...(preview.saved ?? {}) });
+  }
+
   async function loadHeaders(selectedFile: File, currentSource: string) {
     setError(null);
+
+    // Checked by content, not extension: a zip/OOXML file ("PK") is a
+    // candidate .xlsx. Papa Parse can't read that client-side, so it's
+    // sent to the server, which parses (and validates) it for real.
+    const head = new Uint8Array(await selectedFile.slice(0, 2).arrayBuffer());
+    const isZipBased = head[0] === 0x50 && head[1] === 0x4b;
+
+    if (isZipBased) {
+      const formData = new FormData();
+      formData.set("file", selectedFile);
+      formData.set("source", currentSource);
+      await applyPreview(formData);
+      return;
+    }
 
     Papa.parse<Record<string, string>>(selectedFile, {
       header: true,
       skipEmptyLines: true,
       preview: 1,
       complete: async (parsed) => {
-        const fileHeaders = parsed.meta.fields ?? [];
-        setHeaders(fileHeaders);
-
         const formData = new FormData();
-        formData.set("headers", JSON.stringify(fileHeaders));
+        formData.set("headers", JSON.stringify(parsed.meta.fields ?? []));
         formData.set("sampleRow", JSON.stringify(parsed.data[0] ?? null));
         formData.set("source", currentSource);
-
-        const preview = await previewMapping(formData);
-        if ("error" in preview) {
-          setError(preview.error);
-          return;
-        }
-        setMapping({ ...preview.suggested, ...(preview.saved ?? {}) });
+        await applyPreview(formData);
       },
       error: () => setError("Could not read that file"),
     });
@@ -101,10 +116,10 @@ export function ImportForm() {
         />
       </label>
       <label>
-        File (CSV or TSV)
+        File (CSV, TSV or Excel)
         <input
           type="file"
-          accept=".csv,.tsv,text/csv,text/tab-separated-values"
+          accept=".csv,.tsv,.xlsx,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
         />
       </label>

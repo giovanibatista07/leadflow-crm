@@ -18,13 +18,20 @@ export type LeadField = (typeof LEAD_FIELDS)[number];
 
 export type ColumnMapping = Partial<Record<LeadField, string>>;
 
+export type ImportFileKind = "xlsx" | "text";
+
+export type SniffResult = { ok: true; kind: ImportFileKind } | { ok: false; reason: string };
+
 /**
- * Checked by content, not extension (CLAUDE.md). Rejects anything that
- * isn't plain delimited text: Excel/zip files start with the "PK" local
- * file header, legacy .xls with the OLE2 signature, and genuinely binary
- * data contains null bytes a CSV/TSV never would.
+ * Checked by content, not extension (CLAUDE.md). A zip/OOXML file ("PK"
+ * local file header) is treated as a candidate .xlsx -- the caller still
+ * needs to reject it if it turns out to be macro-enabled. A legacy .xls
+ * (OLE2 signature) isn't supported: ExcelJS, the library CLAUDE.md
+ * specifies, can only read the modern .xlsx format. Anything else must be
+ * plain CSV/TSV text; genuinely binary data contains null bytes that text
+ * never would.
  */
-export function sniffTabularFile(buffer: Buffer): { ok: true } | { ok: false; reason: string } {
+export function sniffImportFile(buffer: Buffer): SniffResult {
   if (buffer.length === 0) {
     return { ok: false, reason: "The file is empty" };
   }
@@ -34,18 +41,21 @@ export function sniffTabularFile(buffer: Buffer): { ok: true } | { ok: false; re
 
   const head = buffer.subarray(0, 8);
   if (head[0] === 0x50 && head[1] === 0x4b) {
-    return { ok: false, reason: "This looks like an Excel or zip file, not CSV/TSV" };
+    return { ok: true, kind: "xlsx" };
   }
   if (head[0] === 0xd0 && head[1] === 0xcf && head[2] === 0x11 && head[3] === 0xe0) {
-    return { ok: false, reason: "This looks like a legacy Excel file, not CSV/TSV" };
+    return {
+      ok: false,
+      reason: "Legacy .xls files aren't supported -- please save as .xlsx, .csv or .tsv",
+    };
   }
 
   const sample = buffer.subarray(0, Math.min(buffer.length, 8000));
   if (sample.includes(0)) {
-    return { ok: false, reason: "This file contains binary data, not plain text" };
+    return { ok: false, reason: "This file contains binary data, not plain text, CSV/TSV or .xlsx" };
   }
 
-  return { ok: true };
+  return { ok: true, kind: "text" };
 }
 
 /** Prevents formula injection (CLAUDE.md): a leading =, +, - or @ opens a formula in spreadsheet apps. */
