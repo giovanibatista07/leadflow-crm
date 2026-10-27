@@ -21,6 +21,7 @@ import { importFormSchema, leadImportRowSchema } from "@/lib/validation/import";
 import { extractSpreadsheetId, fetchSheetData } from "@/lib/google/sheets";
 import { getValidAccessToken } from "@/lib/google/token";
 import type { CurrentUser } from "@/lib/auth/session";
+import { assignAdvisorsToNewLeads } from "@/lib/assignment/service";
 
 export type MappingPreviewResult =
   | { error: string }
@@ -186,7 +187,7 @@ async function runImport(
   await prisma.$transaction(
     async (tx) => {
       if (toInsert.length > 0) {
-        await tx.lead.createMany({
+        const createdLeads = await tx.lead.createManyAndReturn({
           data: toInsert.map((row) => ({
             companyId: user.companyId,
             firstName: escapeFormulaInjection(row.firstName),
@@ -199,7 +200,24 @@ async function runImport(
             location: row.location ? escapeFormulaInjection(row.location) : null,
             notes: row.notes ? escapeFormulaInjection(row.notes) : null,
           })),
+          select: { id: true },
         });
+
+        const assignedCount = await assignAdvisorsToNewLeads(
+          tx,
+          user.companyId,
+          createdLeads.map((l) => l.id),
+        );
+        if (assignedCount > 0) {
+          await tx.auditLog.create({
+            data: {
+              companyId: user.companyId,
+              userId: user.id,
+              action: "leads_assigned",
+              targetType: "import_batch",
+            },
+          });
+        }
       }
 
       const createdBatch = await tx.importBatch.create({

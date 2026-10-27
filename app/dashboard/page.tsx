@@ -31,6 +31,8 @@ export default async function DashboardPage() {
             <Link href="/cadence">Cadences</Link>
           </>
         )}
+        {" · "}
+        <Link href="/leads">Leads</Link>
       </p>
       <form action={logOut}>
         <button type="submit">Log out</button>
