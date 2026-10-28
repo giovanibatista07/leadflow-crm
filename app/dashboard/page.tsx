@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
 import { logOut } from "@/app/login/actions";
@@ -10,6 +11,10 @@ export default async function DashboardPage() {
   if (!user) {
     redirect("/login");
   }
+
+  const unreadNotifications = await prisma.notification.count({
+    where: { userId: user.id, readAt: null },
+  });
 
   return (
     <main>
@@ -45,6 +50,10 @@ export default async function DashboardPage() {
             <Link href="/closer">Closer board</Link>
           </>
         )}
+        {" · "}
+        <Link href="/notifications">
+          Notifications{unreadNotifications > 0 ? ` (${unreadNotifications})` : ""}
+        </Link>
       </p>
       <form action={logOut}>
         <button type="submit">Log out</button>
