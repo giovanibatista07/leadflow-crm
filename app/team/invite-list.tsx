@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { getInviteStatus, type InviteStatus } from "@/lib/auth/invite";
+import { getInviteStatus, type InviteStatus } from "@/lib/auth/invite-status";
 import { revokeInvite } from "./actions";
 
 type InviteRow = {
