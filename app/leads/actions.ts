@@ -40,6 +40,7 @@ export async function reassignLead(formData: FormData): Promise<ActionResult> {
   });
 
   revalidatePath("/leads");
+  revalidatePath(`/leads/${parsed.data.leadId}`);
   return { success: true };
 }
 
@@ -89,5 +90,7 @@ export async function handoffLead(formData: FormData): Promise<ActionResult> {
   });
 
   revalidatePath("/leads");
+  revalidatePath(`/leads/${parsed.data.leadId}`);
+  revalidatePath("/closer");
   return { success: true };
 }

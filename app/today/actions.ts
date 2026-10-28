@@ -38,22 +38,26 @@ export async function logActivity(formData: FormData): Promise<ActionResult> {
     return { error: "You can only log activity on your own leads" };
   }
 
-  await prisma.$transaction(async (tx) => {
-    await tx.activity.create({
-      data: {
-        companyId: user.companyId,
-        leadId,
-        userId: user.id,
-        type,
-        outcome,
-        notes: notes ?? null,
-        scheduledAt: outcome === "CALL_BACK_LATER" ? scheduledAt : null,
-        completedAt: new Date(),
-      },
-    });
-    await applyActivityOutcome(tx, user.companyId, leadId, outcome, scheduledAt);
-  });
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.activity.create({
+        data: {
+          companyId: user.companyId,
+          leadId,
+          userId: user.id,
+          type,
+          outcome,
+          notes: notes ?? null,
+          scheduledAt: outcome === "CALL_BACK_LATER" ? scheduledAt : null,
+          completedAt: new Date(),
+        },
+      });
+      await applyActivityOutcome(tx, user.companyId, leadId, outcome, scheduledAt);
+    },
+    { timeout: 20000 },
+  );
 
   revalidatePath("/today");
+  revalidatePath(`/leads/${leadId}`);
   return { success: true };
 }
