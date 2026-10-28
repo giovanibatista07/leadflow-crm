@@ -25,9 +25,13 @@ Guidance for Claude Code when working in the LeadFlow CRM repo. Read this every 
 - Scheduled job every 15 minutes for due cadence steps.
 - Hosted on Vercel (free Hobby plan). The 15-minute cadence sweep runs via
   `.github/workflows/cron-sweep.yml` (a free GitHub Actions schedule calling
-  `/api/cron/due-steps` with the `CRON_SECRET` bearer token) rather than
-  `vercel.json`'s own cron entry, since Vercel's free Hobby plan only runs
-  Cron Jobs once a day. A Netlify config (`netlify.toml` +
+  `/api/cron/due-steps` with the `CRON_SECRET` bearer token). There's no
+  `vercel.json` cron entry -- Vercel's free Hobby plan rejects any cron
+  schedule more frequent than once a day (it blocks the deploy, not just a
+  warning), so a `*/15 * * * *` entry there would break every deploy. If
+  this project ever moves to a paid Vercel plan, a `vercel.json` with a
+  `crons` entry can replace the GitHub Actions workflow instead of running
+  alongside it. A Netlify config (`netlify.toml` +
   `netlify/functions/cron-sweep.ts`) also exists as an alternative, since
   Netlify's free Scheduled Functions have no daily-only cap.
 
