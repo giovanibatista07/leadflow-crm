@@ -23,7 +23,13 @@ Guidance for Claude Code when working in the LeadFlow CRM repo. Read this every 
 - Papa Parse for CSV and TSV, ExcelJS for Excel, Google Sheets API with the Google Picker for Sheets import.
 - Zod for all input validation.
 - Scheduled job every 15 minutes for due cadence steps.
-- Hosted on Vercel.
+- Hosted on Vercel (free Hobby plan). The 15-minute cadence sweep runs via
+  `.github/workflows/cron-sweep.yml` (a free GitHub Actions schedule calling
+  `/api/cron/due-steps` with the `CRON_SECRET` bearer token) rather than
+  `vercel.json`'s own cron entry, since Vercel's free Hobby plan only runs
+  Cron Jobs once a day. A Netlify config (`netlify.toml` +
+  `netlify/functions/cron-sweep.ts`) also exists as an alternative, since
+  Netlify's free Scheduled Functions have no daily-only cap.
 
 ## Security rules (never break these)
 

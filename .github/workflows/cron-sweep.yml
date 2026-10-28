@@ -1,0 +1,27 @@
+name: Cadence sweep
+
+# Vercel's free Hobby plan only runs Cron Jobs once a day (vercel.json's
+# */15 entry needs a paid plan to actually fire every 15 minutes), so this
+# workflow is the free stand-in: it calls the same /api/cron/due-steps
+# route with the same CRON_SECRET bearer token, on GitHub's own schedule
+# instead. Works regardless of which host (Vercel, Netlify, ...) serves
+# the app -- only APP_URL needs to point at the right place.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron/due-steps
+        run: |
+          status=$(curl -sS -o /dev/stderr -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.APP_URL }}/api/cron/due-steps")
+          echo "HTTP status: $status"
+          if [ "$status" -ge 300 ]; then
+            echo "Sweep call failed" >&2
+            exit 1
+          fi
