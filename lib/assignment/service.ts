@@ -3,6 +3,7 @@ import type { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { distributeRoundRobin, groupByAssignee } from "@/lib/assignment/engine";
 import { startCadenceForLead, startCadenceForLeads } from "@/lib/cadence/service";
+import { notify, notifyMany } from "@/lib/notifications/service";
 
 type TxClient = Prisma.TransactionClient;
 
@@ -88,6 +89,14 @@ export async function assignAdvisorsToNewLeads(
   }
   // Every newly assigned lead starts its cadence at once, not per advisor.
   await startCadenceForLeads(tx, companyId, [...assignments.keys()]);
+
+  await notifyMany(
+    tx,
+    companyId,
+    "NEW_ASSIGNMENT",
+    [...assignments.entries()].map(([leadId, advisorId]) => ({ userId: advisorId, leadId })),
+  );
+
   return assignments.size;
 }
 
@@ -118,6 +127,7 @@ export async function reassignLeadAdvisor(
   if (wasUnstarted) {
     await startCadenceForLead(prisma, companyId, leadId);
   }
+  await notify(prisma, companyId, advisorId, "NEW_ASSIGNMENT", leadId);
   return { success: true };
 }
 
@@ -165,5 +175,6 @@ export async function handoffLeadToCloser(
     where: { id: leadId },
     data: { assignedCloserId: chosenCloserId, status: "WITH_CLOSER" },
   });
+  await notify(prisma, companyId, chosenCloserId, "HANDOFF", leadId);
   return { success: true, closerId: chosenCloserId };
 }

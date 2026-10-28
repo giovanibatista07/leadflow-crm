@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { type NextRequest, NextResponse } from "next/server";
 import { sweepDueSteps } from "@/lib/cadence/service";
+import { sweepNotifications } from "@/lib/notifications/service";
 
 /** Vercel Cron sends this on every invocation; see vercel.json for the 15-minute schedule. */
 function isAuthorized(request: NextRequest): boolean {
@@ -20,6 +21,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await sweepDueSteps();
-  return NextResponse.json(result);
+  const notifications = await sweepNotifications();
+  const dueSteps = await sweepDueSteps();
+  return NextResponse.json({ ...dueSteps, notifications });
 }
