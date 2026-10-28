@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { logActivitySchema } from "@/lib/validation/activity";
+import { logActivitySchema, logCloserActivitySchema } from "@/lib/validation/activity";
 
 const leadId = "11111111-1111-4111-8111-111111111111";
 
@@ -44,6 +44,27 @@ describe("logActivitySchema", () => {
 
   it("rejects an invalid outcome", () => {
     const parsed = logActivitySchema.safeParse({ leadId, type: "CALL", outcome: "GHOSTED" });
+    expect(parsed.success).toBe(false);
+  });
+});
+
+describe("logCloserActivitySchema", () => {
+  it("accepts a closer update with no notes", () => {
+    const parsed = logCloserActivitySchema.safeParse({ leadId, type: "MEETING", outcome: "MEETING_ATTENDED" });
+    expect(parsed.success).toBe(true);
+  });
+
+  it("accepts Won and Lost outcomes", () => {
+    expect(
+      logCloserActivitySchema.safeParse({ leadId, type: "CUSTOM", outcome: "WON" }).success,
+    ).toBe(true);
+    expect(
+      logCloserActivitySchema.safeParse({ leadId, type: "CUSTOM", outcome: "LOST" }).success,
+    ).toBe(true);
+  });
+
+  it("rejects an advisor-only outcome", () => {
+    const parsed = logCloserActivitySchema.safeParse({ leadId, type: "CALL", outcome: "NO_ANSWER" });
     expect(parsed.success).toBe(false);
   });
 });

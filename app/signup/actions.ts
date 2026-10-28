@@ -42,54 +42,57 @@ export async function signUpOwner(formData: FormData): Promise<SignUpResult> {
   const authUserId = data.user.id;
 
   try {
-    await prisma.$transaction(async (tx) => {
-      const company = await tx.company.create({
-        data: { name: companyName, emailDomain },
-      });
+    await prisma.$transaction(
+      async (tx) => {
+        const company = await tx.company.create({
+          data: { name: companyName, emailDomain },
+        });
 
-      const roles = await Promise.all(
-        DEFAULT_ROLES.map((role) =>
-          tx.role.create({
-            data: {
-              companyId: company.id,
-              name: role.name,
-              permissions: [...role.permissions],
-              isDefault: true,
-            },
-          }),
-        ),
-      );
+        const roles = await Promise.all(
+          DEFAULT_ROLES.map((role) =>
+            tx.role.create({
+              data: {
+                companyId: company.id,
+                name: role.name,
+                permissions: [...role.permissions],
+                isDefault: true,
+              },
+            }),
+          ),
+        );
 
-      const ownerRole = roles.find((r) => r.name === "owner");
-      if (!ownerRole) {
-        throw new Error("Owner role was not created");
-      }
+        const ownerRole = roles.find((r) => r.name === "owner");
+        if (!ownerRole) {
+          throw new Error("Owner role was not created");
+        }
 
-      await tx.user.create({
-        data: {
-          id: authUserId,
-          name,
-          email,
-          companyId: company.id,
-          roleId: ownerRole.id,
-        },
-      });
+        await tx.user.create({
+          data: {
+            id: authUserId,
+            name,
+            email,
+            companyId: company.id,
+            roleId: ownerRole.id,
+          },
+        });
 
-      await tx.company.update({
-        where: { id: company.id },
-        data: { ownerId: authUserId },
-      });
+        await tx.company.update({
+          where: { id: company.id },
+          data: { ownerId: authUserId },
+        });
 
-      await tx.auditLog.create({
-        data: {
-          companyId: company.id,
-          userId: authUserId,
-          action: "company_created",
-          targetType: "company",
-          targetId: company.id,
-        },
-      });
-    });
+        await tx.auditLog.create({
+          data: {
+            companyId: company.id,
+            userId: authUserId,
+            action: "company_created",
+            targetType: "company",
+            targetId: company.id,
+          },
+        });
+      },
+      { timeout: 20000 },
+    );
   } catch (dbError) {
     // The Auth user now exists without a matching company/profile row.
     // Clean it up so the person can retry signup with the same email.

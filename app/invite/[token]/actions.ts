@@ -42,32 +42,35 @@ export async function acceptInvite(formData: FormData): Promise<AcceptInviteResu
   const authUserId = data.user.id;
 
   try {
-    await prisma.$transaction(async (tx) => {
-      await tx.user.create({
-        data: {
-          id: authUserId,
-          name,
-          email: invite.email,
-          companyId: invite.companyId,
-          roleId: invite.roleId,
-        },
-      });
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.user.create({
+          data: {
+            id: authUserId,
+            name,
+            email: invite.email,
+            companyId: invite.companyId,
+            roleId: invite.roleId,
+          },
+        });
 
-      await tx.invite.update({
-        where: { id: invite.id },
-        data: { acceptedAt: new Date() },
-      });
+        await tx.invite.update({
+          where: { id: invite.id },
+          data: { acceptedAt: new Date() },
+        });
 
-      await tx.auditLog.create({
-        data: {
-          companyId: invite.companyId,
-          userId: authUserId,
-          action: "invite_accepted",
-          targetType: "invite",
-          targetId: invite.id,
-        },
-      });
-    });
+        await tx.auditLog.create({
+          data: {
+            companyId: invite.companyId,
+            userId: authUserId,
+            action: "invite_accepted",
+            targetType: "invite",
+            targetId: invite.id,
+          },
+        });
+      },
+      { timeout: 20000 },
+    );
   } catch (dbError) {
     await admin.auth.admin.deleteUser(authUserId).catch(() => {});
     const message = dbError instanceof Error ? dbError.message : "Could not finish creating your account";

@@ -73,21 +73,24 @@ export async function sweepDueSteps(now: Date = new Date()): Promise<SweepResult
     });
     if (overdueLeads.length === 0) continue;
 
-    await prisma.$transaction(async (tx) => {
-      await tx.lead.updateMany({
-        where: { id: { in: overdueLeads.map((l) => l.id) } },
-        data: { status: "UNRESPONSIVE" },
-      });
-      await tx.auditLog.createMany({
-        data: overdueLeads.map((lead) => ({
-          companyId: company.id,
-          userId: null,
-          action: "lead_unresponsive",
-          targetType: "lead",
-          targetId: lead.id,
-        })),
-      });
-    });
+    await prisma.$transaction(
+      async (tx) => {
+        await tx.lead.updateMany({
+          where: { id: { in: overdueLeads.map((l) => l.id) } },
+          data: { status: "UNRESPONSIVE" },
+        });
+        await tx.auditLog.createMany({
+          data: overdueLeads.map((lead) => ({
+            companyId: company.id,
+            userId: null,
+            action: "lead_unresponsive",
+            targetType: "lead",
+            targetId: lead.id,
+          })),
+        });
+      },
+      { timeout: 20000 },
+    );
     markedUnresponsive += overdueLeads.length;
   }
 

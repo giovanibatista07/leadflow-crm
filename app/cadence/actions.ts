@@ -38,26 +38,29 @@ export async function createCadence(formData: FormData): Promise<ActionResult> {
     return { error: parsed.error.issues[0]?.message ?? "Invalid input" };
   }
 
-  await prisma.$transaction(async (tx) => {
-    if (parsed.data.isDefault) {
-      await tx.cadence.updateMany({
-        where: { companyId: user.companyId, isDefault: true },
-        data: { isDefault: false },
+  await prisma.$transaction(
+    async (tx) => {
+      if (parsed.data.isDefault) {
+        await tx.cadence.updateMany({
+          where: { companyId: user.companyId, isDefault: true },
+          data: { isDefault: false },
+        });
+      }
+      const cadence = await tx.cadence.create({
+        data: { companyId: user.companyId, name: parsed.data.name, isDefault: parsed.data.isDefault },
       });
-    }
-    const cadence = await tx.cadence.create({
-      data: { companyId: user.companyId, name: parsed.data.name, isDefault: parsed.data.isDefault },
-    });
-    await tx.auditLog.create({
-      data: {
-        companyId: user.companyId,
-        userId: user.id,
-        action: "cadence_created",
-        targetType: "cadence",
-        targetId: cadence.id,
-      },
-    });
-  });
+      await tx.auditLog.create({
+        data: {
+          companyId: user.companyId,
+          userId: user.id,
+          action: "cadence_created",
+          targetType: "cadence",
+          targetId: cadence.id,
+        },
+      });
+    },
+    { timeout: 20000 },
+  );
 
   revalidatePath("/cadence");
   return { success: true };

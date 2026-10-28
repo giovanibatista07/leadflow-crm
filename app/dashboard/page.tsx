@@ -39,6 +39,12 @@ export default async function DashboardPage() {
             <Link href="/today">Today queue</Link>
           </>
         )}
+        {(hasPermission(user, "set_won_lost") || hasPermission(user, "view_all_leads")) && (
+          <>
+            {" · "}
+            <Link href="/closer">Closer board</Link>
+          </>
+        )}
       </p>
       <form action={logOut}>
         <button type="submit">Log out</button>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { handoffLead, reassignLead } from "./actions";
 
 type Person = { id: string; name: string };
@@ -61,7 +62,9 @@ export function LeadRow({
 
   return (
     <tr>
-      <td>{lead.name}</td>
+      <td>
+        <Link href={`/leads/${lead.id}`}>{lead.name}</Link>
+      </td>
       <td>{lead.status}</td>
       <td>{lead.source}</td>
       <td>{lead.advisorName ?? "Unassigned"}</td>
