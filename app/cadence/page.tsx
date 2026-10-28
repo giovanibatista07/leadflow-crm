@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
+import { AppShell } from "@/components/app-shell";
 import { CadenceForm } from "./cadence-form";
 import { StepForm } from "./step-form";
 import { DeleteStepButton, SetDefaultButton } from "./cadence-buttons";
@@ -26,42 +26,61 @@ export default async function CadencePage() {
   ]);
 
   return (
-    <main>
-      <p>
-        <Link href="/dashboard">Back to dashboard</Link>
-      </p>
-      <h1>Cadences</h1>
+    <AppShell user={user}>
+      <main>
+        <h1>Cadences</h1>
 
-      {cadences.map((cadence) => (
-        <section key={cadence.id}>
-          <h2>
-            {cadence.name} {cadence.isDefault ? "(default)" : ""}
-          </h2>
-          {!cadence.isDefault && <SetDefaultButton cadenceId={cadence.id} />}
+        <div className="mt-6 space-y-6">
+          {cadences.map((cadence) => (
+            <section key={cadence.id} className="card">
+              <div className="flex flex-wrap items-center gap-2">
+                <h2>{cadence.name}</h2>
+                {cadence.isDefault ? (
+                  <span className="badge badge-brand">Default</span>
+                ) : (
+                  <SetDefaultButton cadenceId={cadence.id} />
+                )}
+              </div>
 
-          <ol>
-            {cadence.steps.map((step) => (
-              <li key={step.id}>
-                {step.actionType} — {step.assignedRole.name} —{" "}
-                {step.waitDays != null ? `wait ${step.waitDays}d` : "end of sequence"}
-                {step.defaultTime ? ` @ ${step.defaultTime}` : ""}
-                {step.templateText ? ` — "${step.templateText}"` : ""}{" "}
-                <DeleteStepButton stepId={step.id} />
-              </li>
-            ))}
-          </ol>
+              <ol className="mt-3 space-y-2">
+                {cadence.steps.map((step) => (
+                  <li
+                    key={step.id}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-100 bg-slate-50 px-3 py-2 text-sm"
+                  >
+                    <span>
+                      <span className="badge badge-brand mr-2">{step.actionType}</span>
+                      {step.assignedRole.name} —{" "}
+                      {step.waitDays != null ? `wait ${step.waitDays}d` : "end of sequence"}
+                      {step.defaultTime ? ` @ ${step.defaultTime}` : ""}
+                      {step.templateText ? ` — "${step.templateText}"` : ""}
+                    </span>
+                    <DeleteStepButton stepId={step.id} />
+                  </li>
+                ))}
+              </ol>
 
-          <h3>Add a step</h3>
-          <StepForm
-            cadenceId={cadence.id}
-            nextOrder={(cadence.steps.at(-1)?.order ?? 0) + 1}
-            roles={roles}
-          />
-        </section>
-      ))}
+              <div className="mt-4 border-t border-slate-100 pt-4">
+                <h3>Add a step</h3>
+                <div className="mt-2">
+                  <StepForm
+                    cadenceId={cadence.id}
+                    nextOrder={(cadence.steps.at(-1)?.order ?? 0) + 1}
+                    roles={roles}
+                  />
+                </div>
+              </div>
+            </section>
+          ))}
+        </div>
 
-      <h2>New cadence</h2>
-      <CadenceForm />
-    </main>
+        <div className="card mt-6">
+          <h2>New cadence</h2>
+          <div className="mt-2">
+            <CadenceForm />
+          </div>
+        </div>
+      </main>
+    </AppShell>
   );
 }

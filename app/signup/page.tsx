@@ -29,62 +29,72 @@ export default function SignUpPage() {
   }
 
   return (
-    <main>
-      <h1>Create your company account</h1>
-      <form action={handleSubmit}>
-        <label>
-          Your name
-          <input
-            name="name"
-            type="text"
-            required
-            autoComplete="name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
-        <label>
-          Company name
-          <input
-            name="companyName"
-            type="text"
-            required
-            value={companyName}
-            onChange={(e) => setCompanyName(e.target.value)}
-          />
-        </label>
-        <label>
-          Email
-          <input
-            name="email"
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </label>
-        <label>
-          Password
-          <input
-            name="password"
-            type="password"
-            required
-            autoComplete="new-password"
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-        <button type="submit" disabled={pending}>
-          {pending ? "Creating account..." : "Create account"}
-        </button>
-      </form>
-      {error && <p role="alert">{error}</p>}
-      {message && <p>{message}</p>}
-      <p>
-        Already have an account? <Link href="/login">Log in</Link>
-      </p>
+    <main className="flex min-h-[80vh] items-center justify-center">
+      <div className="card w-full max-w-sm">
+        <h1>Create your company account</h1>
+        <form action={handleSubmit} className="mt-4 space-y-4">
+          <div>
+            <label htmlFor="name">Your name</label>
+            <input
+              id="name"
+              name="name"
+              type="text"
+              required
+              autoComplete="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="companyName">Company name</label>
+            <input
+              id="companyName"
+              name="companyName"
+              type="text"
+              required
+              value={companyName}
+              onChange={(e) => setCompanyName(e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="email">Email</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              autoComplete="new-password"
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          {error && (
+            <p role="alert" className="form-error">
+              {error}
+            </p>
+          )}
+          {message && <p className="form-success">{message}</p>}
+          <button type="submit" disabled={pending} className="w-full">
+            {pending ? "Creating account..." : "Create account"}
+          </button>
+        </form>
+        <p className="mt-4 text-center">
+          Already have an account? <Link href="/login">Log in</Link>
+        </p>
+      </div>
     </main>
   );
 }

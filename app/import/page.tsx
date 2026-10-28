@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
+import { AppShell } from "@/components/app-shell";
 import { ImportForm } from "./import-form";
 import { SheetImportForm } from "./sheet-import-form";
 
@@ -20,22 +20,23 @@ export default async function ImportPage() {
   });
 
   return (
-    <main>
-      <p>
-        <Link href="/dashboard">Back to dashboard</Link>
-      </p>
-      <h1>Import leads</h1>
-      <ImportForm />
+    <AppShell user={user}>
+      <main>
+        <h1>Import leads</h1>
+        <div className="mt-4">
+          <ImportForm />
+        </div>
 
-      <hr />
-
-      {googleConnection ? (
-        <SheetImportForm />
-      ) : (
-        <p>
-          <a href="/api/google/connect">Connect Google to import from Sheets</a>
-        </p>
-      )}
-    </main>
+        <div className="mt-6">
+          {googleConnection ? (
+            <SheetImportForm />
+          ) : (
+            <p className="card">
+              <a href="/api/google/connect">Connect Google to import from Sheets</a>
+            </p>
+          )}
+        </div>
+      </main>
+    </AppShell>
   );
 }

@@ -22,7 +22,7 @@ export function AcceptInviteForm({ token, email }: { token: string; email: strin
   }
 
   return (
-    <form action={handleSubmit}>
+    <form action={handleSubmit} className="space-y-4">
       <input type="hidden" name="token" value={token} />
       <p>Email: {email}</p>
       <label>
@@ -34,6 +34,7 @@ export function AcceptInviteForm({ token, email }: { token: string; email: strin
           autoComplete="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          className="mt-1"
         />
       </label>
       <label>
@@ -46,12 +47,17 @@ export function AcceptInviteForm({ token, email }: { token: string; email: strin
           minLength={8}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
+          className="mt-1"
         />
       </label>
-      <button type="submit" disabled={pending}>
+      <button type="submit" disabled={pending} className="w-full">
         {pending ? "Joining..." : "Join"}
       </button>
-      {error && <p role="alert">{error}</p>}
+      {error && (
+        <p role="alert" className="form-error">
+          {error}
+        </p>
+      )}
     </form>
   );
 }

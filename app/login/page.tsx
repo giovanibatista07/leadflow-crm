@@ -23,39 +23,47 @@ export default function LogInPage() {
   }
 
   return (
-    <main>
-      <h1>Log in</h1>
-      <form action={handleSubmit}>
-        <label>
-          Email
-          <input
-            name="email"
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </label>
-        <label>
-          Password
-          <input
-            name="password"
-            type="password"
-            required
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-        <button type="submit" disabled={pending}>
-          {pending ? "Logging in..." : "Log in"}
-        </button>
-      </form>
-      {error && <p role="alert">{error}</p>}
-      <p>
-        Need an account? <Link href="/signup">Create one</Link>
-      </p>
+    <main className="flex min-h-[80vh] items-center justify-center">
+      <div className="card w-full max-w-sm">
+        <h1>Log in</h1>
+        <form action={handleSubmit} className="mt-4 space-y-4">
+          <div>
+            <label htmlFor="email">Email</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <label htmlFor="password">Password</label>
+            <input
+              id="password"
+              name="password"
+              type="password"
+              required
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+          {error && (
+            <p role="alert" className="form-error">
+              {error}
+            </p>
+          )}
+          <button type="submit" disabled={pending} className="w-full">
+            {pending ? "Logging in..." : "Log in"}
+          </button>
+        </form>
+        <p className="mt-4 text-center">
+          Need an account? <Link href="/signup">Create one</Link>
+        </p>
+      </div>
     </main>
   );
 }

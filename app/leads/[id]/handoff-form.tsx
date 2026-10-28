@@ -21,16 +21,28 @@ export function HandoffForm({ leadId, closers }: { leadId: string; closers: { id
   }
 
   return (
-    <p>
-      <select defaultValue={ROUND_ROBIN} disabled={pending} onChange={(e) => submit(e.target.value)}>
-        <option value={ROUND_ROBIN}>Hand off (round robin)</option>
-        {closers.map((c) => (
-          <option key={c.id} value={c.id}>
-            Hand off to {c.name}
-          </option>
-        ))}
-      </select>
-      {error && <span role="alert"> {error}</span>}
-    </p>
+    <div className="card">
+      <h3>Hand off to closer</h3>
+      <div className="mt-2 flex items-center gap-2">
+        <select
+          defaultValue={ROUND_ROBIN}
+          disabled={pending}
+          onChange={(e) => submit(e.target.value)}
+          className="w-auto"
+        >
+          <option value={ROUND_ROBIN}>Hand off (round robin)</option>
+          {closers.map((c) => (
+            <option key={c.id} value={c.id}>
+              Hand off to {c.name}
+            </option>
+          ))}
+        </select>
+        {error && (
+          <span role="alert" className="text-sm text-red-600">
+            {error}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }

@@ -16,19 +16,19 @@ export function CadenceForm() {
   }
 
   return (
-    <form action={handleSubmit}>
-      <label>
-        Cadence name
+    <form action={handleSubmit} className="space-y-3">
+      <div>
+        <label>Cadence name</label>
         <input name="name" type="text" required />
-      </label>
-      <label>
+      </div>
+      <label className="flex items-center gap-2 font-normal">
         <input name="isDefault" type="checkbox" />
         Make this the default cadence
       </label>
       <button type="submit" disabled={pending}>
         {pending ? "Creating..." : "Create cadence"}
       </button>
-      {error && <p role="alert">{error}</p>}
+      {error && <p className="form-error" role="alert">{error}</p>}
     </form>
   );
 }

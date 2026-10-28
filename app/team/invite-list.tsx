@@ -13,9 +13,20 @@ type InviteRow = {
   role: { name: string };
 };
 
+const STATUS_BADGE: Record<InviteStatus, string> = {
+  valid: "badge-brand",
+  accepted: "badge-green",
+  expired: "badge-slate",
+  revoked: "badge-red",
+};
+
 export function InviteList({ invites }: { invites: InviteRow[] }) {
+  if (invites.length === 0) {
+    return <p>No invites yet.</p>;
+  }
+
   return (
-    <ul>
+    <ul className="space-y-2">
       {invites.map((invite) => (
         <InviteRowItem key={invite.id} invite={invite} />
       ))}
@@ -42,14 +53,25 @@ function InviteRowItem({ invite }: { invite: InviteRow }) {
   }
 
   return (
-    <li>
-      {invite.email} — {invite.role.name} — {status}
+    <li className="flex flex-wrap items-center gap-2 rounded-md border border-slate-100 px-3 py-2 text-sm">
+      <span className="font-medium text-slate-900">{invite.email}</span>
+      <span className="text-slate-500">{invite.role.name}</span>
+      <span className={`badge ${STATUS_BADGE[status]}`}>{status}</span>
       {status === "valid" && (
-        <button type="button" onClick={handleRevoke} disabled={isPending}>
+        <button
+          type="button"
+          onClick={handleRevoke}
+          disabled={isPending}
+          className="btn-danger ml-auto !px-2.5 !py-1 !text-xs"
+        >
           {isPending ? "Revoking..." : "Revoke"}
         </button>
       )}
-      {error && <span role="alert"> {error}</span>}
+      {error && (
+        <span role="alert" className="form-error w-full">
+          {error}
+        </span>
+      )}
     </li>
   );
 }

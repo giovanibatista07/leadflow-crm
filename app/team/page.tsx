@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { canManageRolesAndInvites } from "@/lib/auth/permissions";
+import { AppShell } from "@/components/app-shell";
 import { InviteForm } from "./invite-form";
 import { InviteList } from "./invite-list";
 import { RoleForm } from "./role-form";
@@ -30,41 +30,59 @@ export default async function TeamPage() {
   ]);
 
   return (
-    <main>
-      <p>
-        <Link href="/dashboard">Back to dashboard</Link>
-      </p>
-      <h1>Team</h1>
+    <AppShell user={user}>
+      <main className="space-y-6">
+        <h1>Team</h1>
 
-      <h2>Roles</h2>
-      <ul>
-        {roles.map((role) => (
-          <li key={role.id}>
-            {role.name} {role.isDefault ? "(default)" : "(custom)"} —{" "}
-            {(role.permissions as string[]).join(", ")}
-          </li>
-        ))}
-      </ul>
+        <div className="card">
+          <h2>Roles</h2>
+          <ul className="mt-3 space-y-2">
+            {roles.map((role) => (
+              <li key={role.id} className="flex flex-wrap items-center gap-2 text-sm text-slate-700">
+                <span className="font-medium text-slate-900">{role.name}</span>
+                <span className={`badge ${role.isDefault ? "badge-slate" : "badge-brand"}`}>
+                  {role.isDefault ? "default" : "custom"}
+                </span>
+                <span className="text-slate-500">{(role.permissions as string[]).join(", ")}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
 
-      {canManage && (
-        <>
-          <h3>Create a custom role</h3>
-          <RoleForm />
+        {canManage && (
+          <>
+            <div className="card">
+              <h3>Create a custom role</h3>
+              <div className="mt-3">
+                <RoleForm />
+              </div>
+            </div>
 
-          <h2>Invite someone</h2>
-          <InviteForm roles={roles} companyEmailDomain={user.companyEmailDomain} />
+            <div className="card">
+              <h2>Invite someone</h2>
+              <div className="mt-3">
+                <InviteForm roles={roles} companyEmailDomain={user.companyEmailDomain} />
+              </div>
+            </div>
 
-          <h2>Pending invites</h2>
-          <InviteList invites={invites} />
-        </>
-      )}
+            <div className="card">
+              <h2>Pending invites</h2>
+              <div className="mt-3">
+                <InviteList invites={invites} />
+              </div>
+            </div>
+          </>
+        )}
 
-      {user.roleName === "owner" && (
-        <>
-          <h2>Manager permissions</h2>
-          <DelegationForm initiallyEnabled={user.managersCanManageRolesAndInvites} />
-        </>
-      )}
-    </main>
+        {user.roleName === "owner" && (
+          <div className="card">
+            <h2>Manager permissions</h2>
+            <div className="mt-3">
+              <DelegationForm initiallyEnabled={user.managersCanManageRolesAndInvites} />
+            </div>
+          </div>
+        )}
+      </main>
+    </AppShell>
   );
 }

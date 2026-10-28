@@ -63,56 +63,60 @@ export function SheetImportForm() {
   }
 
   return (
-    <div>
+    <div className="card space-y-3">
       <h2>Import from Google Sheets</h2>
-      <label>
-        Source (e.g. Indeed, LinkedIn)
-        <input type="text" value={source} onChange={(e) => setSource(e.target.value)} />
-      </label>
-      <label>
-        Google Sheets link
-        <input
-          type="text"
-          placeholder="https://docs.google.com/spreadsheets/d/..."
-          value={sheetUrl}
-          onChange={(e) => setSheetUrl(e.target.value)}
-        />
-      </label>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <label>
+          Source (e.g. Indeed, LinkedIn)
+          <input type="text" value={source} onChange={(e) => setSource(e.target.value)} />
+        </label>
+        <label>
+          Google Sheets link
+          <input
+            type="text"
+            placeholder="https://docs.google.com/spreadsheets/d/..."
+            value={sheetUrl}
+            onChange={(e) => setSheetUrl(e.target.value)}
+          />
+        </label>
+      </div>
       <button type="button" onClick={loadPreview} disabled={loadingPreview}>
         {loadingPreview ? "Loading..." : "Load columns"}
       </button>
 
       {headers.length > 0 && (
-        <fieldset>
+        <fieldset className="space-y-2">
           <legend>Column mapping</legend>
-          {LEAD_FIELDS.map((field) => (
-            <label key={field} style={{ display: "block" }}>
-              {FIELD_LABELS[field]}
-              <select
-                value={mapping[field] ?? ""}
-                onChange={(e) =>
-                  setMapping((prev) => ({ ...prev, [field]: e.target.value || undefined }))
-                }
-              >
-                <option value="">(none)</option>
-                {headers.map((h) => (
-                  <option key={h} value={h}>
-                    {h}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
-          <button type="button" onClick={handleImport} disabled={pending}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {LEAD_FIELDS.map((field) => (
+              <label key={field}>
+                {FIELD_LABELS[field]}
+                <select
+                  value={mapping[field] ?? ""}
+                  onChange={(e) =>
+                    setMapping((prev) => ({ ...prev, [field]: e.target.value || undefined }))
+                  }
+                >
+                  <option value="">(none)</option>
+                  {headers.map((h) => (
+                    <option key={h} value={h}>
+                      {h}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+          <button type="button" onClick={handleImport} disabled={pending} className="mt-2">
             {pending ? "Importing..." : "Import"}
           </button>
         </fieldset>
       )}
 
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert" className="form-error">{error}</p>}
 
       {result && "success" in result && (
-        <div>
+        <div className="form-success space-y-1">
           <h3>Import summary</h3>
           <p>Total rows: {result.totalRows}</p>
           <p>Imported: {result.imported}</p>

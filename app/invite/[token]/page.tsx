@@ -17,24 +17,32 @@ export default async function AcceptInvitePage({
 
   if (!invite || status !== "valid") {
     return (
-      <main>
-        <h1>Invite link not valid</h1>
-        <p>
-          {status === "accepted"
-            ? "This invite has already been used."
-            : status === "revoked"
-              ? "This invite has been cancelled."
-              : "This invite link has expired or does not exist. Ask whoever invited you to send a new one."}
-        </p>
+      <main className="flex min-h-[80vh] items-center justify-center">
+        <div className="card w-full max-w-sm">
+          <h1>Invite link not valid</h1>
+          <p className="mt-2">
+            {status === "accepted"
+              ? "This invite has already been used."
+              : status === "revoked"
+                ? "This invite has been cancelled."
+                : "This invite link has expired or does not exist. Ask whoever invited you to send a new one."}
+          </p>
+        </div>
       </main>
     );
   }
 
   return (
-    <main>
-      <h1>Join {invite.company.name}</h1>
-      <p>You&apos;ve been invited as {invite.role.name}.</p>
-      <AcceptInviteForm token={token} email={invite.email} />
+    <main className="flex min-h-[80vh] items-center justify-center">
+      <div className="card w-full max-w-sm">
+        <h1>Join {invite.company.name}</h1>
+        <p className="mt-1">
+          You&apos;ve been invited as <span className="font-medium text-slate-700">{invite.role.name}</span>.
+        </p>
+        <div className="mt-4">
+          <AcceptInviteForm token={token} email={invite.email} />
+        </div>
+      </div>
     </main>
   );
 }

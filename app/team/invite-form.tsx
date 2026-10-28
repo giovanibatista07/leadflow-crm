@@ -30,26 +30,36 @@ export function InviteForm({
   }
 
   return (
-    <form action={handleSubmit}>
-      <label>
-        Email ({companyEmailDomain})
-        <input name="email" type="email" required />
-      </label>
-      <label>
-        Role
-        <select name="roleId" required>
-          {roles.map((role) => (
-            <option key={role.id} value={role.id}>
-              {role.name}
-            </option>
-          ))}
-        </select>
-      </label>
+    <form action={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div>
+          <label>
+            Email ({companyEmailDomain})
+            <input name="email" type="email" required className="mt-1" />
+          </label>
+        </div>
+        <div>
+          <label>
+            Role
+            <select name="roleId" required className="mt-1">
+              {roles.map((role) => (
+                <option key={role.id} value={role.id}>
+                  {role.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      </div>
       <button type="submit" disabled={pending}>
         {pending ? "Sending..." : "Send invite"}
       </button>
-      {error && <p role="alert">{error}</p>}
-      {message && <p>{message}</p>}
+      {error && (
+        <p role="alert" className="form-error">
+          {error}
+        </p>
+      )}
+      {message && <p className="form-success">{message}</p>}
     </form>
   );
 }
