@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission, requirePermission } from "@/lib/auth/permissions";
 import { handoffLeadToCloser, reassignLeadAdvisor } from "@/lib/assignment/service";
 import { handoffLeadSchema, reassignLeadSchema } from "@/lib/validation/assignment";
+import { leadFiltersSchema, saveViewSchema, type LeadFilters } from "@/lib/validation/search";
 
 export type ActionResult = { error: string } | { success: true };
 
@@ -92,5 +93,48 @@ export async function handoffLead(formData: FormData): Promise<ActionResult> {
   revalidatePath("/leads");
   revalidatePath(`/leads/${parsed.data.leadId}`);
   revalidatePath("/closer");
+  return { success: true };
+}
+
+/** SPEC.md: "Saved views per user (for example 'My overdue leads' or 'Qualified this week')." */
+export async function saveView(formData: FormData): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Not signed in" };
+
+  const parsedName = saveViewSchema.safeParse({ name: formData.get("name") });
+  if (!parsedName.success) {
+    return { error: parsedName.error.issues[0]?.message ?? "Invalid input" };
+  }
+
+  const filters: LeadFilters = {};
+  for (const key of Object.keys(leadFiltersSchema.shape) as (keyof LeadFilters)[]) {
+    const value = formData.get(key);
+    if (typeof value !== "string" || value === "") continue;
+    const fieldResult = leadFiltersSchema.shape[key].safeParse(value);
+    if (fieldResult.success) {
+      (filters as Record<string, unknown>)[key] = fieldResult.data;
+    }
+  }
+
+  await prisma.savedView.upsert({
+    where: { userId_name: { userId: user.id, name: parsedName.data.name } },
+    create: { companyId: user.companyId, userId: user.id, name: parsedName.data.name, filters },
+    update: { filters },
+  });
+
+  revalidatePath("/leads");
+  return { success: true };
+}
+
+export async function deleteView(formData: FormData): Promise<ActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { error: "Not signed in" };
+
+  const viewId = formData.get("viewId");
+  if (typeof viewId !== "string") return { error: "Invalid input" };
+
+  await prisma.savedView.deleteMany({ where: { id: viewId, userId: user.id } });
+
+  revalidatePath("/leads");
   return { success: true };
 }
