@@ -8,7 +8,7 @@ import { AppShell } from "@/components/app-shell";
 import { ActivityForm } from "@/app/today/activity-form";
 import { HandoffForm } from "./handoff-form";
 import { CloserActivityForm } from "./closer-activity-form";
-import { statusBadgeClass } from "@/app/leads/lead-row";
+import { statusBadgeClass } from "@/lib/leads/status-badge";
 
 const HANDOFF_ELIGIBLE_STATUSES = new Set(["NEW", "IN_SEQUENCE", "QUALIFIED"]);
 
