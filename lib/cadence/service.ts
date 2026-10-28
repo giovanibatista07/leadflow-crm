@@ -1,6 +1,8 @@
 import "server-only";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/db";
+import { computeDueDate, getNextStepOrder } from "@/lib/cadence/engine";
+import type { ActivityOutcome } from "@/lib/validation/activity";
 
 type TxClient = Prisma.TransactionClient;
 
@@ -90,4 +92,63 @@ export async function sweepDueSteps(now: Date = new Date()): Promise<SweepResult
   }
 
   return { markedUnresponsive };
+}
+
+/**
+ * Applies SPEC.md section 5's outcome rules after an advisor logs an
+ * attempt. "Sequence finished with no response" is deliberately absent --
+ * that one is the cadence scheduler's job (sweepDueSteps), not something
+ * logged here.
+ */
+export async function applyActivityOutcome(
+  client: TxClient | typeof prisma,
+  companyId: string,
+  leadId: string,
+  outcome: ActivityOutcome,
+  scheduledAt?: Date,
+): Promise<void> {
+  if (outcome === "QUALIFIED") {
+    await client.lead.update({
+      where: { id: leadId },
+      data: { status: "QUALIFIED", nextDueAt: null },
+    });
+    return;
+  }
+
+  if (outcome === "NOT_INTERESTED") {
+    await client.lead.update({
+      where: { id: leadId },
+      data: { status: "LOST", nextDueAt: null },
+    });
+    return;
+  }
+
+  if (outcome === "CALL_BACK_LATER") {
+    await client.lead.update({
+      where: { id: leadId },
+      data: { nextDueAt: scheduledAt },
+    });
+    return;
+  }
+
+  // NO_ANSWER: advance to the next step on schedule, if there is one.
+  const lead = await client.lead.findUniqueOrThrow({
+    where: { id: leadId },
+    select: { currentStep: true },
+  });
+  const cadence = await client.cadence.findFirst({
+    where: { companyId, isDefault: true },
+    include: { steps: { orderBy: { order: "asc" } } },
+  });
+  const currentStepRecord = cadence?.steps.find((s) => s.order === lead.currentStep);
+  if (!cadence || !currentStepRecord) return;
+
+  const nextOrder = getNextStepOrder(cadence.steps, lead.currentStep);
+  if (nextOrder == null) return;
+
+  const nextDueAt = computeDueDate(new Date(), currentStepRecord.waitDays) ?? new Date();
+  await client.lead.update({
+    where: { id: leadId },
+    data: { currentStep: nextOrder, nextDueAt },
+  });
 }

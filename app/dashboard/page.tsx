@@ -33,6 +33,12 @@ export default async function DashboardPage() {
         )}
         {" · "}
         <Link href="/leads">Leads</Link>
+        {hasPermission(user, "view_own_leads") && (
+          <>
+            {" · "}
+            <Link href="/today">Today queue</Link>
+          </>
+        )}
       </p>
       <form action={logOut}>
         <button type="submit">Log out</button>
