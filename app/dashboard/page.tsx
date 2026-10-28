@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
-import { hasPermission } from "@/lib/auth/permissions";
+import { hasPermission, isManagerOrOwner } from "@/lib/auth/permissions";
 import { logOut } from "@/app/login/actions";
 
 export default async function DashboardPage() {
@@ -55,6 +55,12 @@ export default async function DashboardPage() {
         <Link href="/notifications">
           Notifications{unreadNotifications > 0 ? ` (${unreadNotifications})` : ""}
         </Link>
+        {isManagerOrOwner(user) && (
+          <>
+            {" · "}
+            <Link href="/audit-log">Audit log</Link>
+          </>
+        )}
       </p>
       <p>
         {googleConnection ? (

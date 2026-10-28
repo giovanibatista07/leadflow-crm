@@ -55,12 +55,19 @@ jobs:
       # mechanics directly, so this CI job emulates them the same way local
       # dev does: /supabase/migrations is unmodified from what ships to
       # Supabase; the shim below exists only here and under tests/rls.
+      #
+      # Applies every file in /supabase/migrations, in filename order, not
+      # a hardcoded list -- a hardcoded list silently stops testing RLS for
+      # any table added after it was written, which is exactly what let
+      # invites and import_mappings go unenforced here for two whole steps
+      # until new tests for them caught it.
       - name: Apply RLS policies (and the local-only Supabase auth shim)
         run: |
           npx prisma db execute --file tests/rls/local-supabase-shim.sql --url "$DATABASE_URL"
-          npx prisma db execute --file supabase/migrations/0001_rls_helper_functions.sql --url "$DATABASE_URL"
-          npx prisma db execute --file supabase/migrations/0002_enable_rls.sql --url "$DATABASE_URL"
-          npx prisma db execute --file supabase/migrations/0003_rls_policies.sql --url "$DATABASE_URL"
+          for f in supabase/migrations/*.sql; do
+            echo "Applying $f"
+            npx prisma db execute --file "$f" --url "$DATABASE_URL"
+          done
 
       - run: npm test
 

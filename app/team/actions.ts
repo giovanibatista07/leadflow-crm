@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { PermissionError, requireManageRolesAndInvites } from "@/lib/auth/permissions";
 import { generateInviteToken, inviteExpiryDate, isEmailOnCompanyDomain } from "@/lib/auth/invite";
+import { isInviteRateLimited } from "@/lib/auth/rate-limit";
 import { createInviteSchema, createRoleSchema } from "@/lib/validation/team";
 
 export type ActionResult = { error: string } | { success: true; message?: string };
@@ -39,6 +40,10 @@ export async function createInvite(formData: FormData): Promise<ActionResult> {
 
   if (!isEmailOnCompanyDomain(email, user.companyEmailDomain)) {
     return { error: `Invites can only be sent to addresses on ${user.companyEmailDomain}` };
+  }
+
+  if (await isInviteRateLimited(user.id)) {
+    return { error: "Too many invites sent recently. Try again later." };
   }
 
   const role = await prisma.role.findFirst({ where: { id: roleId, companyId: user.companyId } });

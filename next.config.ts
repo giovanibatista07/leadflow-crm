@@ -1,5 +1,51 @@
 import type { NextConfig } from "next";
 
-const nextConfig: NextConfig = {};
+// CLAUDE.md: "Security headers: Content Security Policy, HSTS,
+// X-Frame-Options and secure, HTTP-only cookies." (Cookies themselves are
+// handled by @supabase/ssr's own secure defaults, not here.)
+//
+// Nothing in this app loads a script, style, image or frame from anywhere
+// but itself -- there's no client-side Supabase/Google fetch, no embedded
+// third-party widgets -- so the policy stays this tight rather than
+// allowlisting origins nothing actually uses.
+//
+// script-src needs 'unsafe-inline': Next.js injects its own inline
+// hydration/bootstrap scripts, so a strict nonce-free script-src would
+// break every page. 'self' still blocks loading any script from an
+// untrusted external origin, the more common injection vector, and
+// nothing here uses dangerouslySetInnerHTML to put attacker-controlled
+// markup on the page in the first place. Full nonce-based hardening is a
+// known gap. 'unsafe-eval' is added in dev only -- React's dev-mode
+// debugging tools (component stack reconstruction) use eval(); production
+// React never does.
+const scriptSrc = `script-src 'self' 'unsafe-inline'${process.env.NODE_ENV !== "production" ? " 'unsafe-eval'" : ""}`;
+
+const securityHeaders = [
+  {
+    key: "Content-Security-Policy",
+    value: [
+      "default-src 'self'",
+      scriptSrc,
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data:",
+      "font-src 'self'",
+      "connect-src 'self'",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+    ].join("; "),
+  },
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+];
+
+const nextConfig: NextConfig = {
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders }];
+  },
+};
 
 export default nextConfig;

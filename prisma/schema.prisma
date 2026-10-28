@@ -391,3 +391,20 @@ model GoogleConnection {
   @@index([companyId])
   @@map("google_connections")
 }
+
+// ---------------------------------------------------------------------------
+// Failed login attempts (CLAUDE.md: "Rate limiting on sign-in and invites;
+// alerts on repeated failed logins"). No company_id -- a failed attempt
+// isn't tied to a validated company, only ever to the email typed in. Never
+// read through the app's normal data paths, only by the rate-limit check
+// itself, so it carries no RLS policies (locked down by default).
+// ---------------------------------------------------------------------------
+
+model FailedLoginAttempt {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email     String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([email, createdAt])
+  @@map("failed_login_attempts")
+}
