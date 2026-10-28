@@ -40,31 +40,39 @@ export function ActivityForm({ leadId, type }: { leadId: string; type: string })
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <select value={outcome} onChange={(e) => setOutcome(e.target.value as ActivityOutcome)}>
-        {ACTIVITY_OUTCOMES.map((o) => (
-          <option key={o} value={o}>
-            {OUTCOME_LABELS[o]}
-          </option>
-        ))}
-      </select>
-      {outcome === "CALL_BACK_LATER" && (
-        <input
-          type="datetime-local"
-          value={callBackAt}
-          onChange={(e) => setCallBackAt(e.target.value)}
-          required
-        />
-      )}
+    <form onSubmit={handleSubmit} className="space-y-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={outcome}
+          onChange={(e) => setOutcome(e.target.value as ActivityOutcome)}
+          className="w-auto"
+        >
+          {ACTIVITY_OUTCOMES.map((o) => (
+            <option key={o} value={o}>
+              {OUTCOME_LABELS[o]}
+            </option>
+          ))}
+        </select>
+        {outcome === "CALL_BACK_LATER" && (
+          <input
+            type="datetime-local"
+            value={callBackAt}
+            onChange={(e) => setCallBackAt(e.target.value)}
+            required
+            className="w-auto"
+          />
+        )}
+      </div>
       <textarea
         placeholder={outcome === "NOT_INTERESTED" ? "Reason (required)" : "Notes (optional)"}
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
+        rows={2}
       />
       <button type="submit" disabled={pending}>
         {pending ? "Logging..." : "Log activity"}
       </button>
-      {error && <p role="alert">{error}</p>}
+      {error && <p className="form-error" role="alert">{error}</p>}
     </form>
   );
 }

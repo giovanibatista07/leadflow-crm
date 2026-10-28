@@ -4,9 +4,11 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
 import { LocalDateTime } from "@/components/local-date-time";
+import { AppShell } from "@/components/app-shell";
 import { ActivityForm } from "@/app/today/activity-form";
 import { HandoffForm } from "./handoff-form";
 import { CloserActivityForm } from "./closer-activity-form";
+import { statusBadgeClass } from "@/app/leads/lead-row";
 
 const HANDOFF_ELIGIBLE_STATUSES = new Set(["NEW", "IN_SEQUENCE", "QUALIFIED"]);
 
@@ -63,56 +65,66 @@ export default async function LeadDetailPage({ params }: { params: Promise<{ id:
     lead.status !== "LOST";
 
   return (
-    <main>
-      <p>
-        <Link href="/leads">Back to leads</Link>
-      </p>
-      <h1>
-        {lead.firstName} {lead.lastName}
-      </h1>
-      <p>
-        Status: {lead.status} · Source: {lead.source}
-      </p>
-      <ul>
-        {lead.email && <li>Email: {lead.email}</li>}
-        {lead.phone && <li>Phone: {lead.phone}</li>}
-        {lead.sport && <li>Sport: {lead.sport}</li>}
-        {lead.position && <li>Position: {lead.position}</li>}
-        {lead.location && <li>Location: {lead.location}</li>}
-        {lead.notes && <li>Notes: {lead.notes}</li>}
-      </ul>
-      <p>
-        Advisor: {lead.assignedAdvisor?.name ?? "Unassigned"} · Closer: {lead.assignedCloser?.name ?? "—"}
-      </p>
-      {lead.status === "IN_SEQUENCE" && (
+    <AppShell user={user}>
+      <main>
         <p>
-          Current step: {currentStepRecord?.actionType ?? "—"}
-          {lead.nextDueAt && (
-            <>
-              {" "}
-              — due <LocalDateTime iso={lead.nextDueAt} />
-            </>
-          )}
+          <Link href="/leads">← Back to leads</Link>
         </p>
-      )}
+        <h1 className="mt-2">
+          {lead.firstName} {lead.lastName}
+        </h1>
+        <p className="mt-1 flex items-center gap-2">
+          <span className={`badge ${statusBadgeClass(lead.status)}`}>{lead.status}</span>
+          <span>Source: {lead.source}</span>
+        </p>
 
-      {showHandoff && <HandoffForm leadId={lead.id} closers={closers} />}
-      {canLogAdvisorActivity && currentStepRecord && (
-        <ActivityForm leadId={lead.id} type={currentStepRecord.actionType} />
-      )}
-      {canLogCloserActivity && <CloserActivityForm leadId={lead.id} />}
+        <div className="card mt-4">
+          <ul className="space-y-1 text-sm text-slate-700">
+            {lead.email && <li>Email: {lead.email}</li>}
+            {lead.phone && <li>Phone: {lead.phone}</li>}
+            {lead.sport && <li>Sport: {lead.sport}</li>}
+            {lead.position && <li>Position: {lead.position}</li>}
+            {lead.location && <li>Location: {lead.location}</li>}
+            {lead.notes && <li>Notes: {lead.notes}</li>}
+          </ul>
+          <p className="mt-3 border-t border-slate-100 pt-3">
+            Advisor: {lead.assignedAdvisor?.name ?? "Unassigned"} · Closer: {lead.assignedCloser?.name ?? "—"}
+          </p>
+          {lead.status === "IN_SEQUENCE" && (
+            <p className="mt-1">
+              Current step: {currentStepRecord?.actionType ?? "—"}
+              {lead.nextDueAt && (
+                <>
+                  {" "}
+                  — due <LocalDateTime iso={lead.nextDueAt} />
+                </>
+              )}
+            </p>
+          )}
+        </div>
 
-      <h2>Activity timeline</h2>
-      <ul>
-        {lead.activities.map((activity) => (
-          <li key={activity.id}>
-            <LocalDateTime iso={activity.completedAt ?? activity.createdAt} /> — {activity.user.name} —{" "}
-            {activity.type} — {activity.outcome}
-            {activity.notes ? ` — "${activity.notes}"` : ""}
-          </li>
-        ))}
-        {lead.activities.length === 0 && <li>No activity logged yet.</li>}
-      </ul>
-    </main>
+        {(showHandoff || (canLogAdvisorActivity && currentStepRecord) || canLogCloserActivity) && (
+          <div className="mt-4 space-y-4">
+            {showHandoff && <HandoffForm leadId={lead.id} closers={closers} />}
+            {canLogAdvisorActivity && currentStepRecord && (
+              <ActivityForm leadId={lead.id} type={currentStepRecord.actionType} />
+            )}
+            {canLogCloserActivity && <CloserActivityForm leadId={lead.id} />}
+          </div>
+        )}
+
+        <h2 className="mt-6">Activity timeline</h2>
+        <ul className="mt-2 space-y-2">
+          {lead.activities.map((activity) => (
+            <li key={activity.id} className="card text-sm">
+              <LocalDateTime iso={activity.completedAt ?? activity.createdAt} /> — {activity.user.name} —{" "}
+              {activity.type} — {activity.outcome}
+              {activity.notes ? ` — "${activity.notes}"` : ""}
+            </li>
+          ))}
+          {lead.activities.length === 0 && <li className="text-sm text-slate-500">No activity logged yet.</li>}
+        </ul>
+      </main>
+    </AppShell>
   );
 }

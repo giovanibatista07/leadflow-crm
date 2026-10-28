@@ -19,6 +19,21 @@ type LeadSummary = {
 const HANDOFF_ELIGIBLE_STATUSES = new Set(["NEW", "IN_SEQUENCE", "QUALIFIED"]);
 const ROUND_ROBIN = "__round_robin__";
 
+const STATUS_BADGE_CLASS: Record<string, string> = {
+  NEW: "badge-slate",
+  IN_SEQUENCE: "badge-brand",
+  QUALIFIED: "badge-amber",
+  WITH_CLOSER: "badge-amber",
+  WON: "badge-green",
+  LOST: "badge-red",
+  UNRESPONSIVE: "badge-slate",
+  DO_NOT_CONTACT: "badge-red",
+};
+
+export function statusBadgeClass(status: string): string {
+  return STATUS_BADGE_CLASS[status] ?? "badge-slate";
+}
+
 export function LeadRow({
   lead,
   advisors,
@@ -65,43 +80,53 @@ export function LeadRow({
       <td>
         <Link href={`/leads/${lead.id}`}>{lead.name}</Link>
       </td>
-      <td>{lead.status}</td>
+      <td>
+        <span className={`badge ${statusBadgeClass(lead.status)}`}>{lead.status}</span>
+      </td>
       <td>{lead.source}</td>
       <td>{lead.advisorName ?? "Unassigned"}</td>
       <td>{lead.closerName ?? "—"}</td>
       {(canReassign || canHandoff) && (
         <td>
-          {canReassign && (
-            <select
-              defaultValue=""
-              disabled={pending}
-              onChange={(e) => submitReassign(e.target.value)}
-            >
-              <option value="" disabled>
-                Reassign to...
-              </option>
-              {advisors.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.name}
+          <div className="flex flex-wrap items-center gap-2">
+            {canReassign && (
+              <select
+                defaultValue=""
+                disabled={pending}
+                onChange={(e) => submitReassign(e.target.value)}
+                className="w-auto"
+              >
+                <option value="" disabled>
+                  Reassign to...
                 </option>
-              ))}
-            </select>
-          )}
-          {showHandoff && (
-            <select
-              defaultValue={ROUND_ROBIN}
-              disabled={pending}
-              onChange={(e) => submitHandoff(e.target.value)}
-            >
-              <option value={ROUND_ROBIN}>Hand off (round robin)</option>
-              {closers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          )}
-          {error && <span role="alert"> {error}</span>}
+                {advisors.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {showHandoff && (
+              <select
+                defaultValue={ROUND_ROBIN}
+                disabled={pending}
+                onChange={(e) => submitHandoff(e.target.value)}
+                className="w-auto"
+              >
+                <option value={ROUND_ROBIN}>Hand off (round robin)</option>
+                {closers.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            )}
+            {error && (
+              <span role="alert" className="text-xs text-red-600">
+                {error}
+              </span>
+            )}
+          </div>
         </td>
       )}
     </tr>

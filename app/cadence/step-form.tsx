@@ -25,51 +25,53 @@ export function StepForm({
   }
 
   return (
-    <form action={handleSubmit}>
+    <form action={handleSubmit} className="space-y-3">
       <input type="hidden" name="cadenceId" value={cadenceId} />
-      <label>
-        Step #
-        <input name="order" type="number" min={1} defaultValue={nextOrder} required />
-      </label>
-      <label>
-        Action
-        <select name="actionType" defaultValue="EMAIL">
-          {CADENCE_ACTION_TYPES.map((type) => (
-            <option key={type} value={type}>
-              {type}
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label>Step #</label>
+          <input name="order" type="number" min={1} defaultValue={nextOrder} required />
+        </div>
+        <div>
+          <label>Action</label>
+          <select name="actionType" defaultValue="EMAIL">
+            {CADENCE_ACTION_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label>Performed by</label>
+          <select name="assignedRoleId" required defaultValue="">
+            <option value="" disabled>
+              Choose a role
             </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Performed by
-        <select name="assignedRoleId" required defaultValue="">
-          <option value="" disabled>
-            Choose a role
-          </option>
-          {roles.map((role) => (
-            <option key={role.id} value={role.id}>
-              {role.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label>
-        Wait before next step (days, blank = end of sequence)
-        <input name="waitDays" type="number" min={0} />
-      </label>
-      <label>
-        Default time (HH:MM, optional)
-        <input name="defaultTime" type="text" placeholder="09:00" />
-      </label>
-      <label>
-        Template text (optional)
-        <textarea name="templateText" />
-      </label>
+            {roles.map((role) => (
+              <option key={role.id} value={role.id}>
+                {role.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label>Wait before next step (days, blank = end of sequence)</label>
+          <input name="waitDays" type="number" min={0} />
+        </div>
+        <div>
+          <label>Default time (HH:MM, optional)</label>
+          <input name="defaultTime" type="text" placeholder="09:00" />
+        </div>
+      </div>
+      <div>
+        <label>Template text (optional)</label>
+        <textarea name="templateText" rows={2} />
+      </div>
       <button type="submit" disabled={pending}>
         {pending ? "Adding..." : "Add step"}
       </button>
-      {error && <p role="alert">{error}</p>}
+      {error && <p className="form-error" role="alert">{error}</p>}
     </form>
   );
 }

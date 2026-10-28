@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission } from "@/lib/auth/permissions";
 import { buildLeadWhere } from "@/lib/leads/filters";
 import { LEAD_STATUSES, parseLeadFilters, type LeadFilters } from "@/lib/validation/search";
+import { AppShell } from "@/components/app-shell";
 import { LeadRow } from "./lead-row";
 import { SavedViews } from "./saved-views";
 
@@ -67,87 +68,98 @@ export default async function LeadsPage({
   ]);
 
   return (
-    <main>
-      <p>
-        <Link href="/dashboard">Back to dashboard</Link>
-      </p>
-      <h1>Leads</h1>
+    <AppShell user={user}>
+      <main>
+        <h1>Leads</h1>
 
-      <form method="get">
-        <input type="text" name="q" placeholder="Search name, email, phone, sport, position" defaultValue={filters.q ?? ""} />
-        <select name="status" defaultValue={filters.status ?? ""}>
-          <option value="">Any status</option>
-          {LEAD_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-        <input type="number" name="step" placeholder="Step" min={1} defaultValue={filters.step ?? ""} />
-        <select name="advisorId" defaultValue={filters.advisorId ?? ""}>
-          <option value="">Any advisor</option>
-          {advisors.map((a) => (
-            <option key={a.id} value={a.id}>
-              {a.name}
-            </option>
-          ))}
-        </select>
-        <select name="closerId" defaultValue={filters.closerId ?? ""}>
-          <option value="">Any closer</option>
-          {closers.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-        <input type="text" name="source" placeholder="Source" defaultValue={filters.source ?? ""} />
-        <label>
-          Due after
-          <input type="date" name="dueAfter" defaultValue={filters.dueAfter ?? ""} />
-        </label>
-        <label>
-          Due before
-          <input type="date" name="dueBefore" defaultValue={filters.dueBefore ?? ""} />
-        </label>
-        <button type="submit">Search</button>
-        <Link href="/leads">Clear</Link>
-      </form>
+        <form method="get" className="card mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <input
+            type="text"
+            name="q"
+            placeholder="Search name, email, phone, sport, position"
+            defaultValue={filters.q ?? ""}
+            className="sm:col-span-3"
+          />
+          <select name="status" defaultValue={filters.status ?? ""}>
+            <option value="">Any status</option>
+            {LEAD_STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+          <input type="number" name="step" placeholder="Step" min={1} defaultValue={filters.step ?? ""} />
+          <select name="advisorId" defaultValue={filters.advisorId ?? ""}>
+            <option value="">Any advisor</option>
+            {advisors.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+          <select name="closerId" defaultValue={filters.closerId ?? ""}>
+            <option value="">Any closer</option>
+            {closers.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <input type="text" name="source" placeholder="Source" defaultValue={filters.source ?? ""} />
+          <label>
+            Due after
+            <input type="date" name="dueAfter" defaultValue={filters.dueAfter ?? ""} />
+          </label>
+          <label>
+            Due before
+            <input type="date" name="dueBefore" defaultValue={filters.dueBefore ?? ""} />
+          </label>
+          <div className="flex items-center gap-3 sm:col-span-3">
+            <button type="submit">Search</button>
+            <Link href="/leads">Clear</Link>
+          </div>
+        </form>
 
-      <SavedViews views={savedViews} currentQueryString={filtersToQueryString(filters)} />
+        <div className="mt-4">
+          <SavedViews views={savedViews} currentQueryString={filtersToQueryString(filters)} />
+        </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th>Name</th>
-            <th>Status</th>
-            <th>Source</th>
-            <th>Advisor</th>
-            <th>Closer</th>
-            {(canReassign || canHandoff) && <th>Actions</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {leads.map((lead) => (
-            <LeadRow
-              key={lead.id}
-              lead={{
-                id: lead.id,
-                name: `${lead.firstName} ${lead.lastName}`,
-                status: lead.status,
-                source: lead.source,
-                assignedAdvisorId: lead.assignedAdvisorId,
-                advisorName: lead.assignedAdvisor?.name ?? null,
-                closerName: lead.assignedCloser?.name ?? null,
-              }}
-              advisors={advisors}
-              closers={closers}
-              canReassign={canReassign}
-              canHandoff={canHandoff && (canReassign || lead.assignedAdvisorId === user.id)}
-            />
-          ))}
-        </tbody>
-      </table>
-      {leads.length === 0 && <p>No leads match.</p>}
-    </main>
+        <div className="mt-6 overflow-x-auto">
+          <table>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Status</th>
+                <th>Source</th>
+                <th>Advisor</th>
+                <th>Closer</th>
+                {(canReassign || canHandoff) && <th>Actions</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {leads.map((lead) => (
+                <LeadRow
+                  key={lead.id}
+                  lead={{
+                    id: lead.id,
+                    name: `${lead.firstName} ${lead.lastName}`,
+                    status: lead.status,
+                    source: lead.source,
+                    assignedAdvisorId: lead.assignedAdvisorId,
+                    advisorName: lead.assignedAdvisor?.name ?? null,
+                    closerName: lead.assignedCloser?.name ?? null,
+                  }}
+                  advisors={advisors}
+                  closers={closers}
+                  canReassign={canReassign}
+                  canHandoff={canHandoff && (canReassign || lead.assignedAdvisorId === user.id)}
+                />
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {leads.length === 0 && <p className="mt-4">No leads match.</p>}
+      </main>
+    </AppShell>
   );
 }

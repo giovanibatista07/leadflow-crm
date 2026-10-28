@@ -106,63 +106,68 @@ export function ImportForm() {
   }
 
   return (
-    <div>
-      <label>
-        Source (e.g. Indeed, LinkedIn)
-        <input
-          type="text"
-          value={source}
-          onChange={(e) => setSource(e.target.value)}
-          onBlur={handleSourceBlur}
-        />
-      </label>
-      <label>
-        File (CSV, TSV or Excel)
-        <input
-          type="file"
-          accept=".csv,.tsv,.xlsx,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
-        />
-      </label>
+    <div className="card space-y-3">
+      <h2>Import from file</h2>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <label>
+          Source (e.g. Indeed, LinkedIn)
+          <input
+            type="text"
+            value={source}
+            onChange={(e) => setSource(e.target.value)}
+            onBlur={handleSourceBlur}
+          />
+        </label>
+        <label>
+          File (CSV, TSV or Excel)
+          <input
+            type="file"
+            accept=".csv,.tsv,.xlsx,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
+          />
+        </label>
+      </div>
 
       {headers.length > 0 && (
-        <fieldset>
+        <fieldset className="space-y-2">
           <legend>Column mapping</legend>
-          {LEAD_FIELDS.map((field) => (
-            <label key={field} style={{ display: "block" }}>
-              {FIELD_LABELS[field]}
-              <select
-                value={mapping[field] ?? ""}
-                onChange={(e) =>
-                  setMapping((prev) => ({ ...prev, [field]: e.target.value || undefined }))
-                }
-              >
-                <option value="">(none)</option>
-                {headers.map((h) => (
-                  <option key={h} value={h}>
-                    {h}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ))}
-          <button type="button" onClick={handleImport} disabled={pending}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {LEAD_FIELDS.map((field) => (
+              <label key={field}>
+                {FIELD_LABELS[field]}
+                <select
+                  value={mapping[field] ?? ""}
+                  onChange={(e) =>
+                    setMapping((prev) => ({ ...prev, [field]: e.target.value || undefined }))
+                  }
+                >
+                  <option value="">(none)</option>
+                  {headers.map((h) => (
+                    <option key={h} value={h}>
+                      {h}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+          <button type="button" onClick={handleImport} disabled={pending} className="mt-2">
             {pending ? "Importing..." : "Import"}
           </button>
         </fieldset>
       )}
 
-      {error && <p role="alert">{error}</p>}
+      {error && <p role="alert" className="form-error">{error}</p>}
 
       {result && "success" in result && (
-        <div>
-          <h2>Import summary</h2>
+        <div className="form-success space-y-1">
+          <h3>Import summary</h3>
           <p>Total rows in file: {result.totalRows}</p>
           <p>Imported: {result.imported}</p>
           <p>Skipped as duplicates: {result.duplicatesSkipped}</p>
           <p>Flagged invalid: {result.flaggedInvalid}</p>
           {result.invalidSamples.length > 0 && (
-            <ul>
+            <ul className="list-disc pl-5">
               {result.invalidSamples.map((sample) => (
                 <li key={sample}>{sample}</li>
               ))}

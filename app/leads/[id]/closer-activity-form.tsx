@@ -39,30 +39,40 @@ export function CloserActivityForm({ leadId }: { leadId: string }) {
   }
 
   return (
-    <form onSubmit={handleSubmit}>
-      <select value={type} onChange={(e) => setType(e.target.value)}>
-        {CADENCE_ACTION_TYPES.map((t) => (
-          <option key={t} value={t}>
-            {t}
-          </option>
-        ))}
-      </select>
-      <select value={outcome} onChange={(e) => setOutcome(e.target.value as CloserActivityOutcome)}>
-        {CLOSER_ACTIVITY_OUTCOMES.map((o) => (
-          <option key={o} value={o}>
-            {OUTCOME_LABELS[o]}
-          </option>
-        ))}
-      </select>
+    <form onSubmit={handleSubmit} className="card space-y-3">
+      <h3>Log closer update</h3>
+      <div className="flex flex-wrap gap-2">
+        <select value={type} onChange={(e) => setType(e.target.value)} className="w-auto">
+          {CADENCE_ACTION_TYPES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+        <select
+          value={outcome}
+          onChange={(e) => setOutcome(e.target.value as CloserActivityOutcome)}
+          className="w-auto"
+        >
+          {CLOSER_ACTIVITY_OUTCOMES.map((o) => (
+            <option key={o} value={o}>
+              {OUTCOME_LABELS[o]}
+            </option>
+          ))}
+        </select>
+      </div>
       <textarea
         placeholder="Notes (optional)"
         value={notes}
         onChange={(e) => setNotes(e.target.value)}
+        rows={2}
       />
-      <button type="submit" disabled={pending}>
-        {pending ? "Logging..." : "Log update"}
-      </button>
-      {error && <p role="alert">{error}</p>}
+      <div className="flex items-center gap-2">
+        <button type="submit" disabled={pending}>
+          {pending ? "Logging..." : "Log update"}
+        </button>
+        {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+      </div>
     </form>
   );
 }
