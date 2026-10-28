@@ -1,7 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
-import { createOAuthClient, GOOGLE_SHEETS_SCOPES } from "@/lib/google/oauth";
+import { createOAuthClient, GOOGLE_SCOPES } from "@/lib/google/oauth";
 import { encryptTokens } from "@/lib/google/crypto";
 
 export async function GET(request: NextRequest) {
@@ -25,11 +25,11 @@ export async function GET(request: NextRequest) {
       create: {
         companyId: user.companyId,
         userId: user.id,
-        scopes: GOOGLE_SHEETS_SCOPES,
+        scopes: GOOGLE_SCOPES,
         encryptedTokens: encryptTokens(JSON.stringify(tokens)),
       },
       update: {
-        scopes: GOOGLE_SHEETS_SCOPES,
+        scopes: GOOGLE_SCOPES,
         encryptedTokens: encryptTokens(JSON.stringify(tokens)),
       },
     });

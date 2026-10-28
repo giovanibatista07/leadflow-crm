@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission, requirePermission } from "@/lib/auth/permissions";
 import { applyActivityOutcome } from "@/lib/cadence/service";
+import { syncLeadCalendarEvent } from "@/lib/calendar/service";
 import { logActivitySchema } from "@/lib/validation/activity";
 
 export type ActionResult = { error: string } | { success: true };
@@ -56,6 +57,10 @@ export async function logActivity(formData: FormData): Promise<ActionResult> {
     },
     { timeout: 20000 },
   );
+
+  // A real network call to Google -- kept outside the DB transaction, and
+  // its own failure never undoes the activity that was just logged.
+  await syncLeadCalendarEvent(user.id, user.companyId, leadId, outcome, scheduledAt);
 
   revalidatePath("/today");
   revalidatePath(`/leads/${leadId}`);
