@@ -12,9 +12,10 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
-  const unreadNotifications = await prisma.notification.count({
-    where: { userId: user.id, readAt: null },
-  });
+  const [unreadNotifications, googleConnection] = await Promise.all([
+    prisma.notification.count({ where: { userId: user.id, readAt: null } }),
+    prisma.googleConnection.findUnique({ where: { userId: user.id } }),
+  ]);
 
   return (
     <main>
@@ -54,6 +55,13 @@ export default async function DashboardPage() {
         <Link href="/notifications">
           Notifications{unreadNotifications > 0 ? ` (${unreadNotifications})` : ""}
         </Link>
+      </p>
+      <p>
+        {googleConnection ? (
+          "Google connected (Sheets import, Calendar sync)"
+        ) : (
+          <a href="/api/google/connect">Connect Google (for Sheets import and Calendar sync)</a>
+        )}
       </p>
       <form action={logOut}>
         <button type="submit">Log out</button>

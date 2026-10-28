@@ -185,6 +185,9 @@ model Lead {
   assignedCloserId  String?    @map("assigned_closer_id") @db.Uuid
   currentStep       Int        @default(0) @map("current_step")
   nextDueAt         DateTime?  @map("next_due_at")
+  // The one current Google Calendar event synced for this lead's next due
+  // slot (SPEC.md calendar sync); null when nothing is booked or synced.
+  calendarEventId   String?    @map("calendar_event_id")
   createdAt         DateTime   @default(now()) @map("created_at")
 
   company         Company    @relation(fields: [companyId], references: [id], onDelete: Cascade)

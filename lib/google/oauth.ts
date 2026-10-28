@@ -2,10 +2,13 @@ import "server-only";
 import { google } from "googleapis";
 
 // Narrowest scopes (CLAUDE.md): drive.file only grants access to files the
-// user explicitly opens/creates through this app, never their whole Drive.
-export const GOOGLE_SHEETS_SCOPES = [
+// user explicitly opens/creates through this app, never their whole Drive;
+// calendar.events (not the full calendar scope) only lets the app manage
+// events it creates, never read the rest of the person's calendar.
+export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/drive.file",
   "https://www.googleapis.com/auth/spreadsheets.readonly",
+  "https://www.googleapis.com/auth/calendar.events",
 ];
 
 export function createOAuthClient() {
@@ -21,7 +24,7 @@ export function buildAuthUrl(state: string) {
   return client.generateAuthUrl({
     access_type: "offline",
     prompt: "consent",
-    scope: GOOGLE_SHEETS_SCOPES,
+    scope: GOOGLE_SCOPES,
     state,
   });
 }
