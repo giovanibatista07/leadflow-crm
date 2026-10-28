@@ -26,6 +26,13 @@ const ids = {
   leadA2: randomUUID(), // assigned to advisor2
   leadB1: randomUUID(),
   activityA1: randomUUID(), // on leadA1, logged by advisor1
+  notificationA1: randomUUID(), // for advisor1
+  savedViewA1: randomUUID(), // advisor1's own saved view
+  googleConnectionA1: randomUUID(), // advisor1's own Google connection
+  cadenceA1: randomUUID(),
+  cadenceStepA1: randomUUID(),
+  inviteA1: randomUUID(),
+  importMappingA1: randomUUID(),
 };
 
 let admin: Client;
@@ -89,9 +96,47 @@ beforeAll(async () => {
      values ($1, $2, $3, $4, 'call', 'secret granola note for lead A1')`,
     [ids.activityA1, ids.companyA, ids.leadA1, ids.userAAdvisor1],
   );
+
+  await admin.query(
+    `insert into notifications (id, company_id, user_id, type, lead_id)
+     values ($1, $2, $3, 'NEW_ASSIGNMENT', $4)`,
+    [ids.notificationA1, ids.companyA, ids.userAAdvisor1, ids.leadA1],
+  );
+  await admin.query(
+    `insert into saved_views (id, company_id, user_id, name, filters)
+     values ($1, $2, $3, 'My overdue leads', '{}')`,
+    [ids.savedViewA1, ids.companyA, ids.userAAdvisor1],
+  );
+  await admin.query(
+    `insert into google_connections (id, company_id, user_id, scopes, encrypted_tokens)
+     values ($1, $2, $3, '{}', 'fake-encrypted-token-value')`,
+    [ids.googleConnectionA1, ids.companyA, ids.userAAdvisor1],
+  );
+  await admin.query(`insert into cadences (id, company_id, name) values ($1, $2, 'Default')`, [
+    ids.cadenceA1,
+    ids.companyA,
+  ]);
+  await admin.query(
+    `insert into cadence_steps (id, cadence_id, "order", action_type, assigned_role_id)
+     values ($1, $2, 1, 'EMAIL', $3)`,
+    [ids.cadenceStepA1, ids.cadenceA1, ids.roleAAdvisor],
+  );
+  await admin.query(
+    `insert into invites (id, company_id, email, role_id, invited_by, token_hash, expires_at)
+     values ($1, $2, 'newhire@a-rls-test.example', $3, $4, 'fake-token-hash', now() + interval '72 hours')`,
+    [ids.inviteA1, ids.companyA, ids.roleAAdvisor, ids.userAOwner],
+  );
+  await admin.query(
+    `insert into import_mappings (id, company_id, source, mapping, updated_at)
+     values ($1, $2, 'Indeed', '{}', now())`,
+    [ids.importMappingA1, ids.companyA],
+  );
 });
 
 afterAll(async () => {
+  // cadence_steps references roles without cascade, so it must go before
+  // the company (and its roles) cascade away, or the delete fails.
+  await admin.query(`delete from cadence_steps where id = $1`, [ids.cadenceStepA1]);
   await admin.query(`delete from companies where id in ($1, $2)`, [ids.companyA, ids.companyB]);
   await admin.end();
 });
@@ -198,5 +243,184 @@ describe("companies and users: tenant isolation", () => {
       return res.rows;
     });
     expect(rows).toHaveLength(0);
+  });
+});
+
+describe("notifications: own-user only", () => {
+  it("blocks another advisor in the same company from reading someone else's notification", async () => {
+    const rows = await asUser(admin, ids.userAAdvisor2, async () => {
+      const res = await admin.query(`select id from notifications where id = $1`, [ids.notificationA1]);
+      return res.rows;
+    });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("blocks another advisor from marking someone else's notification read", async () => {
+    const result = await asUser(admin, ids.userAAdvisor2, async () => {
+      return admin.query(`update notifications set read_at = now() where id = $1`, [ids.notificationA1]);
+    });
+    expect(result.rowCount).toBe(0);
+  });
+
+  it("lets the notification's own user read it (sanity check)", async () => {
+    const rows = await asUser(admin, ids.userAAdvisor1, async () => {
+      const res = await admin.query(`select id from notifications where id = $1`, [ids.notificationA1]);
+      return res.rows;
+    });
+    expect(rows).toHaveLength(1);
+  });
+
+  it("blocks a manager from reading another user's notification (own-user, not company-wide)", async () => {
+    const rows = await asUser(admin, ids.userAManager, async () => {
+      const res = await admin.query(`select id from notifications where id = $1`, [ids.notificationA1]);
+      return res.rows;
+    });
+    expect(rows).toHaveLength(0);
+  });
+});
+
+describe("saved_views: private to the user", () => {
+  it("blocks another advisor in the same company from reading someone else's saved view", async () => {
+    const rows = await asUser(admin, ids.userAAdvisor2, async () => {
+      const res = await admin.query(`select id from saved_views where id = $1`, [ids.savedViewA1]);
+      return res.rows;
+    });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("blocks another advisor from deleting someone else's saved view", async () => {
+    const result = await asUser(admin, ids.userAAdvisor2, async () => {
+      return admin.query(`delete from saved_views where id = $1`, [ids.savedViewA1]);
+    });
+    expect(result.rowCount).toBe(0);
+  });
+
+  it("lets the view's own user read it (sanity check)", async () => {
+    const rows = await asUser(admin, ids.userAAdvisor1, async () => {
+      const res = await admin.query(`select id from saved_views where id = $1`, [ids.savedViewA1]);
+      return res.rows;
+    });
+    expect(rows).toHaveLength(1);
+  });
+});
+
+describe("google_connections: own-user only, never cross-user or cross-company", () => {
+  it("blocks another advisor in the same company from reading someone else's encrypted tokens", async () => {
+    const rows = await asUser(admin, ids.userAAdvisor2, async () => {
+      const res = await admin.query(`select encrypted_tokens from google_connections where id = $1`, [
+        ids.googleConnectionA1,
+      ]);
+      return res.rows;
+    });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("blocks a manager from reading another user's connection (own-user, not company-wide)", async () => {
+    const rows = await asUser(admin, ids.userAManager, async () => {
+      const res = await admin.query(`select id from google_connections where id = $1`, [
+        ids.googleConnectionA1,
+      ]);
+      return res.rows;
+    });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("blocks another company from reading it", async () => {
+    const rows = await asUser(admin, ids.userBManager, async () => {
+      const res = await admin.query(`select id from google_connections where id = $1`, [
+        ids.googleConnectionA1,
+      ]);
+      return res.rows;
+    });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("lets the connection's own user read it (sanity check)", async () => {
+    const rows = await asUser(admin, ids.userAAdvisor1, async () => {
+      const res = await admin.query(`select id from google_connections where id = $1`, [
+        ids.googleConnectionA1,
+      ]);
+      return res.rows;
+    });
+    expect(rows).toHaveLength(1);
+  });
+});
+
+describe("cadences and cadence_steps: company-scoped", () => {
+  it("blocks another company from reading a cadence", async () => {
+    const rows = await asUser(admin, ids.userBManager, async () => {
+      const res = await admin.query(`select id from cadences where id = $1`, [ids.cadenceA1]);
+      return res.rows;
+    });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("blocks another company from reading a cadence step", async () => {
+    const rows = await asUser(admin, ids.userBManager, async () => {
+      const res = await admin.query(`select id from cadence_steps where id = $1`, [ids.cadenceStepA1]);
+      return res.rows;
+    });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("lets anyone in the company read its cadence steps (sanity check)", async () => {
+    const rows = await asUser(admin, ids.userAAdvisor1, async () => {
+      const res = await admin.query(`select id from cadence_steps where id = $1`, [ids.cadenceStepA1]);
+      return res.rows;
+    });
+    expect(rows).toHaveLength(1);
+  });
+});
+
+describe("invites: manager/owner visibility only", () => {
+  it("blocks another company from reading an invite", async () => {
+    const rows = await asUser(admin, ids.userBManager, async () => {
+      const res = await admin.query(`select id from invites where id = $1`, [ids.inviteA1]);
+      return res.rows;
+    });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("blocks an advisor from reading their company's invites", async () => {
+    const rows = await asUser(admin, ids.userAAdvisor1, async () => {
+      const res = await admin.query(`select id from invites where id = $1`, [ids.inviteA1]);
+      return res.rows;
+    });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("lets a manager read their company's invites (sanity check)", async () => {
+    const rows = await asUser(admin, ids.userAManager, async () => {
+      const res = await admin.query(`select id from invites where id = $1`, [ids.inviteA1]);
+      return res.rows;
+    });
+    expect(rows).toHaveLength(1);
+  });
+});
+
+describe("import_mappings: company-scoped", () => {
+  it("blocks another company from reading a saved column mapping", async () => {
+    const rows = await asUser(admin, ids.userBManager, async () => {
+      const res = await admin.query(`select id from import_mappings where id = $1`, [ids.importMappingA1]);
+      return res.rows;
+    });
+    expect(rows).toHaveLength(0);
+  });
+
+  it("blocks another company from editing a saved column mapping", async () => {
+    const result = await asUser(admin, ids.userBManager, async () => {
+      return admin.query(`update import_mappings set mapping = '{"x":1}' where id = $1`, [
+        ids.importMappingA1,
+      ]);
+    });
+    expect(result.rowCount).toBe(0);
+  });
+
+  it("lets the company read its own saved mapping (sanity check)", async () => {
+    const rows = await asUser(admin, ids.userAManager, async () => {
+      const res = await admin.query(`select id from import_mappings where id = $1`, [ids.importMappingA1]);
+      return res.rows;
+    });
+    expect(rows).toHaveLength(1);
   });
 });
