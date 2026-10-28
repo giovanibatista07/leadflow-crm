@@ -46,6 +46,15 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  // Prisma's generated client (output path: lib/generated/prisma, set in
+  // prisma/schema.prisma) loads its query engine binary dynamically at
+  // runtime via fs, not a static import -- Next.js's file tracer only
+  // follows static imports/requires, so on Vercel it silently left the
+  // .so.node binary out of every serverless function's bundle even
+  // though the binary exists in the build output. This forces it in.
+  outputFileTracingIncludes: {
+    "/**": ["./lib/generated/prisma/**/*"],
+  },
 };
 
 export default nextConfig;
