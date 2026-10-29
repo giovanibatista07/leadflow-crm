@@ -27,7 +27,13 @@ export function ImportForm() {
   const [result, setResult] = useState<ImportResult | null>(null);
 
   async function applyPreview(formData: FormData) {
-    const preview = await previewMapping(formData);
+    let preview: Awaited<ReturnType<typeof previewMapping>>;
+    try {
+      preview = await previewMapping(formData);
+    } catch {
+      setError("Could not read that file. It may be too large, or the connection dropped.");
+      return;
+    }
     if ("error" in preview) {
       setError(preview.error);
       return;
@@ -95,7 +101,14 @@ export function ImportForm() {
     formData.set("source", source);
     formData.set("mapping", JSON.stringify(mapping));
 
-    const outcome = await importLeads(formData);
+    let outcome: ImportResult;
+    try {
+      outcome = await importLeads(formData);
+    } catch {
+      setPending(false);
+      setError("Import failed. The file may be too large, or the connection dropped.");
+      return;
+    }
     setPending(false);
 
     if ("error" in outcome) {
