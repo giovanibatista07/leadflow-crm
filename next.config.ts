@@ -46,6 +46,17 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  // Lead imports (app/import/actions.ts) send the uploaded CSV/TSV/Excel
+  // file straight to a Server Action. Next.js caps Server Action request
+  // bodies at 1MB by default -- nowhere near lib/import/csv.ts's own
+  // MAX_IMPORT_FILE_BYTES (10MB), so any real-world file upload was
+  // silently rejected before validation ever got a chance to run. Matches
+  // that same 10MB limit so the app's one stated size limit is consistent.
+  experimental: {
+    serverActions: {
+      bodySizeLimit: "10mb",
+    },
+  },
   // Prisma's generated client (output path: lib/generated/prisma, set in
   // prisma/schema.prisma) loads its query engine binary dynamically at
   // runtime via fs, not a static import -- Next.js's file tracer only
